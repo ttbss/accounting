@@ -1,0 +1,9 @@
+# 複製成 .dev.vars 給本機開發用（.dev.vars 不會被 commit）。
+# 本機沒有 Cloudflare Access，所以用這個 email 假裝已登入。
+# 只在 localhost 生效，部署到 Cloudflare 後會被忽略。
+DEV_USER_EMAIL=dev@example.com
+
+# ── 以下是正式環境用的，請用 `npx wrangler secret put <名稱>` 設定，不要寫在檔案裡 ──
+# ACCESS_TEAM_DOMAIN=<你的團隊>.cloudflareaccess.com
+# ACCESS_AUD=<Access 應用程式的 Application Audience (AUD) Tag>
+# ALLOWED_EMAILS=<允許使用的 email，多個用逗號分隔>

@@ -1,0 +1,48 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "accounting",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+
+  // 一個 Worker 同時提供：PWA 靜態檔案 + /api/* 後端 + 每日備份排程
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "accounting",
+      // 部署前：執行 `npx wrangler d1 create accounting`，把拿到的 id 貼在這裡
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "BACKUPS",
+      // 部署前：執行 `npx wrangler r2 bucket create accounting-backups`
+      "bucket_name": "accounting-backups"
+    }
+  ],
+
+  // 每天 UTC 18:00 = 台灣時間凌晨 02:00 備份
+  "triggers": {
+    "crons": ["0 18 * * *"]
+  },
+
+  // 這裡只放「可以公開」的設定。email、Access 金鑰等請用 `wrangler secret put`，
+  // 本機開發放在 .dev.vars（已被 .gitignore 排除）。
+  "vars": {
+    "BACKUP_TIMEZONE": "Asia/Taipei",
+    "BACKUP_RETENTION_DAYS": "30"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
