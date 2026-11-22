@@ -1,6 +1,13 @@
 import { useState } from "react";
 import type { Account, Transaction } from "@accounting/shared";
-import { accountDelta, useAccountBalances, useAccountTransactions, useAccounts, useCategories } from "../lib/data";
+import {
+  accountDelta,
+  useAccountBalances,
+  useAccountTransactions,
+  useAccounts,
+  useCategories,
+  useMerchants,
+} from "../lib/data";
 import { formatMoney, monthLabel } from "../lib/format";
 import { ACCOUNT_TYPE_LABELS, AccountSheet, ManageHeader } from "./ManagePages";
 import { TransactionGroups } from "./TransactionsPage";
@@ -75,6 +82,7 @@ export function AccountDetailPage({
   const accounts = useAccounts(ledgerId);
   const categories = useCategories(ledgerId);
   const transactions = useAccountTransactions(ledgerId, accountId);
+  const merchants = useMerchants(ledgerId);
   const [editingAccount, setEditingAccount] = useState(false);
 
   const account: Account | undefined = accounts?.find((a) => a.id === accountId);
@@ -165,6 +173,7 @@ export function AccountDetailPage({
               transactions={list}
               categories={categories}
               accounts={accounts}
+              merchantById={merchants?.byId}
               currency={currency}
               onEdit={onEdit}
               accountId={accountId}

@@ -94,7 +94,12 @@ type AnyRow = Local<{ id: string; updated_at: number }>;
 async function pushAll(): Promise<void> {
   for (;;) {
     // 一次最多 MAX_PUSH_ROWS 筆；帳戶、分類先送，記帳紀錄後送
-    const batch: Record<(typeof SYNCED_TABLES)[number], AnyRow[]> = { accounts: [], categories: [], transactions: [] };
+    const batch: Record<(typeof SYNCED_TABLES)[number], AnyRow[]> = {
+      accounts: [],
+      categories: [],
+      merchants: [],
+      transactions: [],
+    };
     let room = MAX_PUSH_ROWS;
     for (const t of SYNCED_TABLES) {
       if (room === 0) break;
@@ -108,11 +113,12 @@ async function pushAll(): Promise<void> {
     await api.push({
       accounts: strip(batch.accounts) as never,
       categories: strip(batch.categories) as never,
+      merchants: strip(batch.merchants) as never,
       transactions: strip(batch.transactions) as never,
     });
 
     // 標記為已同步。若推送期間使用者又改了這筆（updated_at 變了），保持 dirty 下次再送。
-    await db.transaction("rw", [db.accounts, db.categories, db.transactions], async () => {
+    await db.transaction("rw", [db.accounts, db.categories, db.merchants, db.transactions], async () => {
       for (const t of SYNCED_TABLES) {
         const sent = batch[t];
         if (sent.length === 0) continue;
@@ -133,10 +139,12 @@ async function pullAll(): Promise<void> {
     res = await api.pull(cursor);
     const { changes } = res;
     const next = res.cursor;
-    await db.transaction("rw", [db.ledgers, db.accounts, db.categories, db.transactions, db.meta], async () => {
+    await db.transaction("rw", [db.ledgers, db.accounts, db.categories, db.merchants, db.transactions, db.meta], async () => {
       await merge(db.ledgers, changes.ledgers);
       await merge(db.accounts, changes.accounts);
       await merge(db.categories, changes.categories);
+      // 舊版伺服器沒有 merchants
+      await merge(db.merchants, changes.merchants ?? []);
       await merge(db.transactions, changes.transactions);
       await setMeta("cursor", next);
     });

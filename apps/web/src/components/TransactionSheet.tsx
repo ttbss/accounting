@@ -3,6 +3,7 @@ import type { EntryKind, Transaction } from "@accounting/shared";
 import {
   deleteTransaction,
   saveCategory,
+  saveMerchant,
   saveTransaction,
   useAccounts,
   useCategories,
@@ -38,7 +39,8 @@ export function TransactionSheet({
   const [accountId, setAccountId] = useState<string | null>(editing?.account_id ?? defaultAccountId ?? null);
   const [toAccountId, setToAccountId] = useState<string | null>(editing?.to_account_id ?? null);
   const [fee, setFee] = useState(editing?.fee ? amountToInput(editing.fee) : "");
-  const [merchant, setMerchant] = useState(editing?.merchant ?? "");
+  /** 店家欄位的文字；存檔時對應到店家清單（沒有就新增） */
+  const [merchant, setMerchant] = useState("");
   /** true = 店家是自動帶入的（新增時），換子分類會跟著換；使用者自己改過就不再自動帶 */
   const [merchantAuto, setMerchantAuto] = useState(!editing);
   const [browsing, setBrowsing] = useState(false);
@@ -61,11 +63,20 @@ export function TransactionSheet({
     (a) => a.deleted_at === null || a.id === accountId || (isTransfer && a.id === toAccountId),
   );
   const merchants = useMerchants(ledgerId);
+  const merchantNames = (merchants?.list ?? []).map((m) => m.name);
   const typedMerchant = merchant.trim();
   const merchantSuggestions =
     !merchantAuto && typedMerchant && !browsing
-      ? (merchants?.all ?? []).filter((m) => m !== typedMerchant && m.includes(typedMerchant)).slice(0, 12)
+      ? merchantNames.filter((m) => m !== typedMerchant && m.includes(typedMerchant)).slice(0, 12)
       : [];
+
+  // 編輯時：店家清單載入後填入這筆的店家名稱
+  const [merchantLoaded, setMerchantLoaded] = useState(false);
+  useEffect(() => {
+    if (merchantLoaded || !merchants) return;
+    setMerchantLoaded(true);
+    if (editing?.merchant_id) setMerchant(merchants.byId.get(editing.merchant_id)?.name ?? "");
+  }, [merchants, merchantLoaded, editing]);
 
   const accountName = (id: string | null) => accounts?.find((a) => a.id === id)?.name ?? "";
 
@@ -99,7 +110,10 @@ export function TransactionSheet({
     setCategoryId(id);
     setError(null);
     // 新增時：帶入上次在這個（子）分類用的店家
-    if (merchantAuto) setMerchant(merchants?.lastByCategory.get(id) ?? "");
+    if (merchantAuto) {
+      const last = merchants?.lastByCategory.get(id);
+      setMerchant((last && merchants?.byId.get(last)?.name) || "");
+    }
   }
 
   /** 再點一次已選的子分類 = 取消子分類，只留上層 */
@@ -149,6 +163,13 @@ export function TransactionSheet({
       return setError("請選擇分類");
     }
     setSaving(true);
+    // 店家名稱 → 店家 id：沿用這筆原本的店家（就算它已被刪除）、同名的店家，或新增一個
+    let merchantId: string | null = null;
+    const merchantName = isTransfer ? "" : merchant.trim();
+    if (merchantName) {
+      const original = editing?.merchant_id ? merchants?.byId.get(editing.merchant_id) : undefined;
+      merchantId = original?.name === merchantName ? original.id : await saveMerchant(ledgerId, merchantName);
+    }
     await saveTransaction(
       ledgerId,
       {
@@ -159,7 +180,7 @@ export function TransactionSheet({
         to_account_id: toAccountId,
         fee: feeMinor,
         date,
-        merchant,
+        merchant_id: merchantId,
         note,
       },
       editing?.id,
@@ -309,7 +330,7 @@ export function TransactionSheet({
                 ))}
               </div>
             )}
-            {browsing && <MerchantBrowser all={merchants?.all ?? []} current={merchant} onPick={chooseMerchant} />}
+            {browsing && <MerchantBrowser all={merchantNames} current={merchant} onPick={chooseMerchant} />}
           </div>
         )}
 
@@ -456,7 +477,7 @@ function MerchantBrowser({
   return (
     <div className="merchant-browser">
       {all.length === 0 ? (
-        <div className="muted merchant-empty">還沒有存過店家。在上面輸入店家名稱，存檔後就會出現在這裡。</div>
+        <div className="muted merchant-empty">還沒有店家。在上面輸入店家名稱，存檔後就會加進店家清單；也可以到「設定 → 店家」管理。</div>
       ) : (
         <>
           <input

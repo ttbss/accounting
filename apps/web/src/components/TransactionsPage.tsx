@@ -1,4 +1,4 @@
-import type { Account, Category, Transaction } from "@accounting/shared";
+import type { Account, Category, Merchant, Transaction } from "@accounting/shared";
 import {
   accountDelta,
   categoryInfo,
@@ -6,6 +6,7 @@ import {
   incomeOf,
   useAccounts,
   useCategories,
+  useMerchants,
   useMonthTransactions,
 } from "../lib/data";
 import { dayLabel, formatMoney } from "../lib/format";
@@ -59,6 +60,7 @@ export function TransactionsPage({
   const transactions = useMonthTransactions(ledgerId, month);
   const categories = useCategories(ledgerId);
   const accounts = useAccounts(ledgerId);
+  const merchants = useMerchants(ledgerId);
 
   return (
     <div className="page">
@@ -84,6 +86,7 @@ export function TransactionsPage({
           transactions={transactions}
           categories={categories}
           accounts={accounts}
+          merchantById={merchants?.byId}
           currency={currency}
           onEdit={onEdit}
         />
@@ -100,10 +103,16 @@ export function TransactionGroups({
   currency,
   onEdit,
   accountId,
+  merchantById,
+  hideMerchant = false,
 }: {
   transactions: Transaction[];
   categories: Category[] | undefined;
   accounts: Account[] | undefined;
+  /** 用來顯示店家名稱（含已刪除的店家） */
+  merchantById?: Map<string, Merchant>;
+  /** 店家明細頁不用每筆都寫店家名稱 */
+  hideMerchant?: boolean;
   currency: string;
   onEdit: (t: Transaction) => void;
   /** 帳戶明細頁：金額改成「對這個帳戶的增減」，也不用每筆都寫帳戶名稱 */
@@ -147,7 +156,8 @@ export function TransactionGroups({
               }
               const cat = categoryInfo(t.category_id, catById);
               const acc = !accountId && t.account_id ? accById.get(t.account_id) : undefined;
-              const sub = [acc?.name, t.merchant, t.note].filter(Boolean).join(" · ");
+              const merchant = !hideMerchant && t.merchant_id ? merchantById?.get(t.merchant_id)?.name : undefined;
+              const sub = [acc?.name, merchant, t.note].filter(Boolean).join(" · ");
               return (
                 <button key={t.id} className="tx-row" onClick={() => onEdit(t)}>
                   <span className="tx-icon" aria-hidden>

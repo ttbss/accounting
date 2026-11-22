@@ -8,7 +8,7 @@ import type { AppEnv } from "./env";
  * 另外 D1 本身也有 Time Travel，可以還原到 30 天內任一時間點。
  */
 
-const TABLES = ["users", "ledgers", "ledger_members", "accounts", "categories", "transactions"] as const;
+const TABLES = ["users", "ledgers", "ledger_members", "accounts", "categories", "merchants", "transactions"] as const;
 
 export interface BackupResult {
   key: string;

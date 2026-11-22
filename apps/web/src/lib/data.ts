@@ -1,4 +1,4 @@
-import type { Account, AccountType, Category, EntryKind, Transaction, TransactionKind } from "@accounting/shared";
+import type { Account, AccountType, Category, EntryKind, Merchant, Transaction, TransactionKind } from "@accounting/shared";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type Local } from "./db";
 import { newId } from "./format";
@@ -26,7 +26,7 @@ export interface TransactionInput {
   fee: number;
   date: string;
   /** 店家（選填，只有收支才有） */
-  merchant: string;
+  merchant_id: string | null;
   note: string;
 }
 
@@ -41,7 +41,7 @@ export async function saveTransaction(ledgerId: string, input: TransactionInput,
     category_id: input.kind === "transfer" ? null : input.category_id,
     to_account_id: input.kind === "transfer" ? input.to_account_id : null,
     fee: input.kind === "transfer" ? input.fee : 0,
-    merchant: input.kind === "transfer" ? "" : input.merchant.trim().slice(0, 100),
+    merchant_id: input.kind === "transfer" ? null : input.merchant_id,
     note: input.note.trim(),
     created_at: existing?.created_at ?? now,
     updated_at: now,
@@ -112,6 +112,47 @@ export async function deleteCategory(id: string): Promise<void> {
       await db.categories.update(c.id, { deleted_at: now, updated_at: now, dirty: 1 });
     }
   });
+  requestSync();
+}
+
+// ── 店家 ─────────────────────────────────────────────────────────────
+
+export class DuplicateMerchantError extends Error {}
+
+/**
+ * 新增或改名店家。新增時若已有同名（未刪除）的店家，直接回傳它的 id；
+ * 改名成已存在的名稱則丟 DuplicateMerchantError。
+ */
+export async function saveMerchant(ledgerId: string, name: string, id?: string): Promise<string> {
+  const clean = name.trim().slice(0, 100);
+  const all = await db.merchants.where("ledger_id").equals(ledgerId).toArray();
+  const same = all.find((m) => m.deleted_at === null && m.name === clean && m.id !== id);
+  if (same) {
+    if (id) throw new DuplicateMerchantError(`已經有叫「${clean}」的店家`);
+    return same.id;
+  }
+  const existing = id ? all.find((m) => m.id === id) : undefined;
+  const now = stamp(existing?.updated_at);
+  const merchantId = existing?.id ?? newId();
+  await db.merchants.put({
+    id: merchantId,
+    ledger_id: ledgerId,
+    name: clean,
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
+    deleted_at: null,
+    dirty: 1,
+  });
+  requestSync();
+  return merchantId;
+}
+
+/** 刪除店家：已記的帳不受影響，仍會顯示這個店家名稱 */
+export async function deleteMerchant(id: string): Promise<void> {
+  const existing = await db.merchants.get(id);
+  if (!existing) return;
+  const now = stamp(existing.updated_at);
+  await db.merchants.update(id, { deleted_at: now, updated_at: now, dirty: 1 });
   requestSync();
 }
 
@@ -205,6 +246,7 @@ export function usePendingCount(): number | undefined {
     const counts = await Promise.all([
       db.accounts.where("dirty").equals(1).count(),
       db.categories.where("dirty").equals(1).count(),
+      db.merchants.where("dirty").equals(1).count(),
       db.transactions.where("dirty").equals(1).count(),
     ]);
     return counts.reduce((a, b) => a + b, 0);
@@ -226,33 +268,74 @@ export function useNoteSuggestions(ledgerId: string, categoryId: string | null):
   }, [ledgerId, categoryId]);
 }
 
-export interface MerchantInfo {
-  /** 所有用過的店家，最近用過的在前面 */
-  all: string[];
-  /** 每個分類（含子分類）上次用的店家 */
-  lastByCategory: Map<string, string>;
+export interface MerchantStats {
+  count: number;
+  /** 支出合計 */
+  expense: number;
+  /** 收入合計 */
+  income: number;
+  lastUsed: number;
+  lastDate: string;
 }
 
-/** 店家清單：從記帳紀錄裡整理出來（店家直接存在每筆紀錄上） */
+export interface MerchantInfo {
+  /** 店家清單（未刪除），最近用過的在前面，沒用過的排最後（新建的在前） */
+  list: Merchant[];
+  /** 全部店家（含已刪除，用來顯示舊紀錄的店家名稱） */
+  byId: Map<string, Merchant>;
+  /** 每個分類（含子分類）上次用的店家 id（只算未刪除的店家） */
+  lastByCategory: Map<string, string>;
+  stats: Map<string, MerchantStats>;
+}
+
 export function useMerchants(ledgerId: string): MerchantInfo | undefined {
   return useLiveQuery(async () => {
-    const rows = await db.transactions.where("ledger_id").equals(ledgerId).toArray();
-    const lastUsed = new Map<string, number>();
-    const lastByCategory = new Map<string, { merchant: string; at: number }>();
+    const [merchants, rows] = await Promise.all([
+      db.merchants.where("ledger_id").equals(ledgerId).toArray(),
+      db.transactions.where("ledger_id").equals(ledgerId).toArray(),
+    ]);
+    const byId = new Map(merchants.map((m) => [m.id, m as Merchant]));
+    const stats = new Map<string, MerchantStats>();
+    const lastByCategory = new Map<string, { id: string; at: number }>();
     for (const t of rows) {
-      const merchant = (t.merchant ?? "").trim();
-      if (t.deleted_at !== null || !merchant) continue;
-      lastUsed.set(merchant, Math.max(lastUsed.get(merchant) ?? 0, t.updated_at));
-      if (t.category_id) {
+      if (t.deleted_at !== null || !t.merchant_id) continue;
+      const s = stats.get(t.merchant_id) ?? { count: 0, expense: 0, income: 0, lastUsed: 0, lastDate: "" };
+      s.count += 1;
+      s.expense += expenseOf(t);
+      s.income += incomeOf(t);
+      s.lastUsed = Math.max(s.lastUsed, t.updated_at);
+      if (t.date > s.lastDate) s.lastDate = t.date;
+      stats.set(t.merchant_id, s);
+      const m = byId.get(t.merchant_id);
+      if (t.category_id && m && m.deleted_at === null) {
         const prev = lastByCategory.get(t.category_id);
-        if (!prev || t.updated_at > prev.at) lastByCategory.set(t.category_id, { merchant, at: t.updated_at });
+        if (!prev || t.updated_at > prev.at) lastByCategory.set(t.category_id, { id: t.merchant_id, at: t.updated_at });
       }
     }
+    const list = merchants
+      .filter((m) => m.deleted_at === null)
+      .sort(
+        (a, b) =>
+          (stats.get(b.id)?.lastUsed ?? 0) - (stats.get(a.id)?.lastUsed ?? 0) || b.created_at - a.created_at,
+      );
     return {
-      all: [...lastUsed.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m),
-      lastByCategory: new Map([...lastByCategory].map(([id, v]) => [id, v.merchant])),
+      list,
+      byId,
+      lastByCategory: new Map([...lastByCategory].map(([cat, v]) => [cat, v.id])),
+      stats,
     };
   }, [ledgerId]);
+}
+
+/** 在某個店家的所有記帳紀錄（新到舊） */
+export function useMerchantTransactions(ledgerId: string, merchantId: string): Transaction[] | undefined {
+  return useLiveQuery(
+    async () =>
+      (await db.transactions.where("[ledger_id+merchant_id]").equals([ledgerId, merchantId]).toArray())
+        .filter((t) => t.deleted_at === null)
+        .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at),
+    [ledgerId, merchantId],
+  );
 }
 
 /** 某個帳戶的所有記帳紀錄（新到舊），包含轉入這個帳戶的轉帳 */

@@ -7,7 +7,7 @@ import { relativeTime } from "../lib/format";
 import { syncNow } from "../lib/sync";
 import { toast, useLastSyncAt, useSyncState, useTick } from "./ui";
 
-export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p: "categories" | "accounts") => void }) {
+export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p: "categories" | "accounts" | "merchants") => void }) {
   const state = useSyncState();
   const pending = usePendingCount() ?? 0;
   const lastSyncAt = useLastSyncAt();
@@ -115,6 +115,10 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
         </button>
         <button className="list-row" onClick={() => onOpen("accounts")}>
           <span className="grow">帳戶</span>
+          <span className="chev">›</span>
+        </button>
+        <button className="list-row" onClick={() => onOpen("merchants")}>
+          <span className="grow">店家</span>
           <span className="chev">›</span>
         </button>
       </div>

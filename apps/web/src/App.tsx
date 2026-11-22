@@ -7,6 +7,7 @@ import { currentMonth } from "./lib/format";
 import { startAutoSync, syncNow } from "./lib/sync";
 import { AccountDetailPage, AccountsListPage } from "./components/AccountsTab";
 import { AccountsPage, CategoriesPage } from "./components/ManagePages";
+import { MerchantsPage } from "./components/MerchantsPage";
 import { OverviewPage } from "./components/OverviewPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { TransactionSheet } from "./components/TransactionSheet";
@@ -14,7 +15,7 @@ import { TransactionsPage } from "./components/TransactionsPage";
 import { ToastHost, useSyncState } from "./components/ui";
 
 type Tab = "list" | "overview" | "accounts" | "settings";
-type SubPage = "categories" | "accounts" | null;
+type SubPage = "categories" | "accounts" | "merchants" | null;
 
 export function App() {
   useEffect(() => startAutoSync(), []);
@@ -113,6 +114,14 @@ function Main({ session }: { session: Session }) {
       )}
       {tab === "settings" && sub === null && <SettingsPage session={session} onOpen={setSub} />}
       {tab === "settings" && sub === "categories" && <CategoriesPage ledgerId={ledgerId} onBack={() => setSub(null)} />}
+      {tab === "settings" && sub === "merchants" && (
+        <MerchantsPage
+          ledgerId={ledgerId}
+          currency={currency}
+          onBack={() => setSub(null)}
+          onEdit={(t) => setSheet({ editing: t })}
+        />
+      )}
       {tab === "settings" && sub === "accounts" && <AccountsPage ledgerId={ledgerId} currency={currency} onBack={() => setSub(null)} />}
 
       {tab !== "settings" && (

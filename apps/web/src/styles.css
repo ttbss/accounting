@@ -1071,3 +1071,7 @@ select.input {
 .merchant-empty {
   padding: 10px;
 }
+
+.search-input {
+  margin-bottom: 12px;
+}

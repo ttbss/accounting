@@ -2,6 +2,7 @@ import type {
   Account,
   Category,
   Ledger,
+  Merchant,
   PullResponse,
   PushRequest,
   Transaction,
@@ -44,7 +45,7 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
   const db = env.DB;
   const limit = PULL_LIMIT + 1; // 多拿一筆，用來判斷是否被截斷
 
-  const [ledgers, accounts, categories, transactions] = await db.batch([
+  const [ledgers, accounts, categories, merchants, transactions] = await db.batch([
     db
       .prepare(
         `SELECT id, name, currency, created_at, updated_at, deleted_at, rev FROM ledgers
@@ -65,7 +66,13 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
       .bind(user.id, cursor, limit),
     db
       .prepare(
-        `SELECT id, ledger_id, kind, amount, category_id, account_id, to_account_id, fee, date, merchant, note,
+        `SELECT id, ledger_id, name, created_at, updated_at, deleted_at, rev FROM merchants
+         WHERE ledger_id IN (${MEMBER_LEDGERS}) AND rev > ?2 ORDER BY rev LIMIT ?3`,
+      )
+      .bind(user.id, cursor, limit),
+    db
+      .prepare(
+        `SELECT id, ledger_id, kind, amount, category_id, account_id, to_account_id, fee, date, merchant_id, note,
                 created_at, updated_at, deleted_at, rev FROM transactions
          WHERE ledger_id IN (${MEMBER_LEDGERS}) AND rev > ?2 ORDER BY rev LIMIT ?3`,
       )
@@ -76,6 +83,7 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
     ledgers: (ledgers?.results ?? []) as WithRev<Ledger>[],
     accounts: (accounts?.results ?? []) as WithRev<Account>[],
     categories: (categories?.results ?? []) as WithRev<Category>[],
+    merchants: (merchants?.results ?? []) as WithRev<Merchant>[],
     transactions: (transactions?.results ?? []) as WithRev<Transaction>[],
   };
 
@@ -100,6 +108,7 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
     ledgers: keep(tables.ledgers),
     accounts: keep(tables.accounts),
     categories: keep(tables.categories),
+    merchants: keep(tables.merchants),
     transactions: keep(tables.transactions),
   };
 
@@ -117,8 +126,8 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
   if (!parsed.success) {
     throw new HttpError(400, parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
   }
-  const { accounts, categories, transactions } = parsed.data;
-  const total = accounts.length + categories.length + transactions.length;
+  const { accounts, categories, merchants, transactions } = parsed.data;
+  const total = accounts.length + categories.length + merchants.length + transactions.length;
   if (total === 0) return 0;
 
   // 只能寫入自己是 owner / editor 的帳本
@@ -128,7 +137,7 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
     .bind(user.id)
     .all<{ ledger_id: string }>();
   const allowed = new Set(writable.results.map((r) => r.ledger_id));
-  for (const row of [...accounts, ...categories, ...transactions]) {
+  for (const row of [...accounts, ...categories, ...merchants, ...transactions]) {
     if (!allowed.has(row.ledger_id)) throw new HttpError(403, `沒有寫入帳本 ${row.ledger_id} 的權限`);
   }
 
@@ -200,20 +209,34 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
     );
   }
 
+  for (const m of merchants) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO merchants (id, ledger_id, name, created_by, created_at, updated_at, deleted_at, rev)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ${NEXT_REV})
+           ON CONFLICT(id) DO UPDATE SET
+             name = excluded.name, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, rev = excluded.rev
+           WHERE excluded.updated_at >= merchants.updated_at AND merchants.ledger_id = excluded.ledger_id`,
+        )
+        .bind(m.id, m.ledger_id, m.name, user.id, m.created_at, clamp(m.updated_at), m.deleted_at),
+    );
+  }
+
   for (const t of transactions) {
     statements.push(
       db
         .prepare(
           `INSERT INTO transactions
              (id, ledger_id, kind, amount, category_id, account_id, date, note, created_by, created_at, updated_at, deleted_at,
-              to_account_id, fee, merchant, rev)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, COALESCE(?14, 0), COALESCE(?16, ''), ${NEXT_REV})
+              to_account_id, fee, merchant_id, rev)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, COALESCE(?14, 0), ?16, ${NEXT_REV})
            ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind, amount = excluded.amount, category_id = excluded.category_id,
              account_id = excluded.account_id, date = excluded.date, note = excluded.note,
              to_account_id = CASE WHEN ?15 THEN excluded.to_account_id ELSE transactions.to_account_id END,
              fee = COALESCE(?14, transactions.fee),
-             merchant = COALESCE(?16, transactions.merchant),
+             merchant_id = CASE WHEN ?17 THEN excluded.merchant_id ELSE transactions.merchant_id END,
              updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, rev = excluded.rev
            WHERE excluded.updated_at >= transactions.updated_at AND transactions.ledger_id = excluded.ledger_id`,
         )
@@ -232,9 +255,10 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
           t.deleted_at,
           t.to_account_id ?? null,
           t.fee ?? null,
-          // 舊版手機沒帶 to_account_id / fee / merchant 時保留原值
+          // 舊版手機沒帶 to_account_id / fee / merchant_id 時保留原值
           t.to_account_id === undefined ? 0 : 1,
-          t.merchant ?? null,
+          t.merchant_id ?? null,
+          t.merchant_id === undefined ? 0 : 1,
         ),
     );
   }

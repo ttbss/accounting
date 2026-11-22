@@ -69,9 +69,19 @@ export const transactionSchema = z.object({
   fee: z.number().int().nonnegative().max(1e13),
   /** 當地日期 YYYY-MM-DD */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  /** 店家（選填，收支才有）；空字串 = 沒填 */
-  merchant: z.string().max(100),
+  /** 店家（選填，收支才有） */
+  merchant_id: id.nullable(),
   note: z.string().max(500),
+  created_at: timestamp,
+  updated_at: timestamp,
+  deleted_at: deletedAt,
+});
+
+/** 店家清單。依最近使用排序，所以沒有 sort_order。 */
+export const merchantSchema = z.object({
+  id,
+  ledger_id: id,
+  name: z.string().trim().min(1).max(100),
   created_at: timestamp,
   updated_at: timestamp,
   deleted_at: deletedAt,
@@ -90,6 +100,7 @@ export type Account = z.infer<typeof accountSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type Transaction = z.infer<typeof transactionSchema>;
 export type Ledger = z.infer<typeof ledgerSchema>;
+export type Merchant = z.infer<typeof merchantSchema>;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -100,20 +111,21 @@ export const pushRequestSchema = z
     // 舊版手機不會帶新欄位；沒帶的話伺服器保留原本的值，不要蓋成預設值
     accounts: z.array(accountSchema.extend({ initial_balance: accountSchema.shape.initial_balance.optional() })).default([]),
     categories: z.array(categorySchema.extend({ parent_id: categorySchema.shape.parent_id.optional() })).default([]),
+    merchants: z.array(merchantSchema).default([]),
     transactions: z
       .array(
         transactionSchema
           .extend({
             to_account_id: transactionSchema.shape.to_account_id.optional(),
             fee: transactionSchema.shape.fee.optional(),
-            merchant: transactionSchema.shape.merchant.optional(),
+            merchant_id: transactionSchema.shape.merchant_id.optional(),
           })
           .refine((t) => t.kind !== "transfer" || t.to_account_id !== null, "轉帳要有轉入帳戶"),
       )
       .default([]),
   })
   .refine(
-    (p) => p.accounts.length + p.categories.length + p.transactions.length <= MAX_PUSH_ROWS,
+    (p) => p.accounts.length + p.categories.length + p.merchants.length + p.transactions.length <= MAX_PUSH_ROWS,
     `一次最多推送 ${MAX_PUSH_ROWS} 筆`,
   );
 
@@ -133,6 +145,7 @@ export interface PullResponse {
     ledgers: Ledger[];
     accounts: Account[];
     categories: Category[];
+    merchants: Merchant[];
     transactions: Transaction[];
   };
 }

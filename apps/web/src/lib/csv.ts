@@ -4,11 +4,13 @@ import { todayStr } from "./format";
 
 /** 匯出整本帳本的記帳紀錄成 CSV（Excel 開得了中文：加 UTF-8 BOM） */
 export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
-  const [transactions, categories, accounts] = await Promise.all([
+  const [transactions, categories, accounts, merchants] = await Promise.all([
     db.transactions.where("ledger_id").equals(ledgerId).toArray(),
     db.categories.where("ledger_id").equals(ledgerId).toArray(),
     db.accounts.where("ledger_id").equals(ledgerId).toArray(),
+    db.merchants.where("ledger_id").equals(ledgerId).toArray(),
   ]);
+  const merchantName = new Map(merchants.map((m) => [m.id, m.name]));
   const catById = new Map(categories.map((c) => [c.id, c]));
   const accName = new Map(accounts.map((a) => [a.id, a.name]));
 
@@ -27,7 +29,7 @@ export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
         (t.account_id && accName.get(t.account_id)) || "",
         (t.to_account_id && accName.get(t.to_account_id)) || "",
         t.fee ? (t.fee / 100).toFixed(2) : "",
-        t.merchant ?? "",
+        (t.merchant_id && merchantName.get(t.merchant_id)) || "",
         t.note,
       ];
     });
