@@ -2,7 +2,17 @@ import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react
 import { useLiveQuery } from "dexie-react-hooks";
 import { relogin } from "../lib/api";
 import { getMeta } from "../lib/db";
-import { currentMonth, monthLabel, relativeTime, shiftMonth } from "../lib/format";
+import {
+  changePeriodUnit,
+  isCurrentPeriod,
+  isLatestPeriod,
+  type Period,
+  type PeriodUnit,
+  periodLabel,
+  relativeTime,
+  shiftPeriod,
+  todayStr,
+} from "../lib/format";
 import { usePendingCount } from "../lib/data";
 import { type SyncState, syncNow, syncStore } from "../lib/sync";
 
@@ -23,22 +33,83 @@ export function useTick(ms = 30_000): void {
   }, [ms]);
 }
 
-export function MonthSwitcher({ month, onChange }: { month: string; onChange: (m: string) => void }) {
-  const isCurrent = month >= currentMonth();
+const UNIT_NAMES: Record<PeriodUnit, string> = { day: "天", month: "個月", year: "年" };
+
+/** 有些桌面瀏覽器不支援 <input type="month">，就改用選日期 */
+const MONTH_INPUT_OK = (() => {
+  try {
+    const i = document.createElement("input");
+    i.type = "month";
+    return i.type === "month";
+  } catch {
+    return false;
+  }
+})();
+
+/** 頁首的「‹ 期間 ›」；點中間的文字可以直接選日期或月份 */
+export function PeriodSwitcher({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+  const unitName = UNIT_NAMES[period.unit];
+  const monthPicker = period.unit === "month" && MONTH_INPUT_OK;
   return (
     <div className="month-switcher">
-      <button className="icon-btn" aria-label="上個月" onClick={() => onChange(shiftMonth(month, -1))}>
+      <button className="icon-btn" aria-label={`上一${unitName}`} onClick={() => onChange(shiftPeriod(period, -1))}>
         ‹
       </button>
-      <span className="label">{monthLabel(month)}</span>
+      <label className="label period-label">
+        {periodLabel(period)}
+        {period.unit !== "year" && (
+          <input
+            className="period-picker"
+            type={monthPicker ? "month" : "date"}
+            aria-label={period.unit === "day" ? "選擇日期" : "選擇月份"}
+            value={monthPicker ? period.anchor.slice(0, 7) : period.anchor}
+            onClick={(e) => {
+              // 桌面版 Chrome 點透明的輸入框不會自己打開選擇器
+              try {
+                e.currentTarget.showPicker?.();
+              } catch {
+                /* 不支援就算了，手機點了本來就會開 */
+              }
+            }}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              onChange({ unit: period.unit, anchor: monthPicker ? `${v}-01` : v });
+            }}
+          />
+        )}
+      </label>
       <button
         className="icon-btn"
-        aria-label="下個月"
-        disabled={isCurrent}
-        onClick={() => onChange(shiftMonth(month, 1))}
+        aria-label={`下一${unitName}`}
+        disabled={isLatestPeriod(period)}
+        onClick={() => onChange(shiftPeriod(period, 1))}
       >
         ›
       </button>
+    </div>
+  );
+}
+
+/** 頁首下面那排：日／月／年，不在本期時可以一鍵回到今天 */
+export function PeriodUnitBar({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+  const back = period.unit === "day" ? "今天" : period.unit === "month" ? "本月" : "今年";
+  return (
+    <div className="period-bar">
+      <Segmented
+        value={period.unit}
+        onChange={(u) => onChange(changePeriodUnit(period, u))}
+        options={[
+          { value: "day", label: "日" },
+          { value: "month", label: "月" },
+          { value: "year", label: "年" },
+        ]}
+      />
+      {!isCurrentPeriod(period) && (
+        <button className="link-btn" onClick={() => onChange({ unit: period.unit, anchor: todayStr() })}>
+          回到{back}
+        </button>
+      )}
     </div>
   );
 }

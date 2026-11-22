@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { TransactionKind } from "@accounting/shared";
-import { categoryInfo, useCategories, useMonthTransactions } from "../lib/data";
-import { formatMoney } from "../lib/format";
+import { categoryInfo, useCategories, useRangeTransactions } from "../lib/data";
+import { formatMoney, type Period, periodNoun, periodRange } from "../lib/format";
 import { Totals } from "./TransactionsPage";
-import { AuthBanner, MonthSwitcher, Segmented, SyncPill } from "./ui";
+import { AuthBanner, PeriodSwitcher, PeriodUnitBar, Segmented, SyncPill } from "./ui";
 
 interface Row {
   id: string;
@@ -16,24 +16,25 @@ interface Row {
 }
 
 /**
- * 每月總覽：收支統計 + 分類排行。
+ * 總覽（日／月／年）：收支統計 + 分類排行。
  * 分類排行用「由大到小的橫條」而不是圓餅圖：分類多的時候，
  * 同一條基準線上的長條比扇形更容易比較大小。
  */
 export function OverviewPage({
   ledgerId,
   currency,
-  month,
-  onMonthChange,
+  period,
+  onPeriodChange,
 }: {
   ledgerId: string;
   currency: string;
-  month: string;
-  onMonthChange: (m: string) => void;
+  period: Period;
+  onPeriodChange: (p: Period) => void;
 }) {
   const [kind, setKind] = useState<TransactionKind>("expense");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const transactions = useMonthTransactions(ledgerId, month);
+  const [start, end] = periodRange(period);
+  const transactions = useRangeTransactions(ledgerId, start, end);
   const categories = useCategories(ledgerId);
 
   const catById = new Map((categories ?? []).map((c) => [c.id, c]));
@@ -80,9 +81,10 @@ export function OverviewPage({
   return (
     <div className="page">
       <header className="page-header">
-        <MonthSwitcher month={month} onChange={onMonthChange} />
+        <PeriodSwitcher period={period} onChange={onPeriodChange} />
         <SyncPill />
       </header>
+      <PeriodUnitBar period={period} onChange={onPeriodChange} />
       <AuthBanner />
 
       {transactions && <Totals transactions={transactions} currency={currency} />}
@@ -97,7 +99,7 @@ export function OverviewPage({
       />
 
       {ranked.length === 0 ? (
-        <div className="empty">這個月沒有{kind === "expense" ? "支出" : "收入"}。</div>
+        <div className="empty">{periodNoun(period.unit)}沒有{kind === "expense" ? "支出" : "收入"}。</div>
       ) : (
         <div className="card rank-list" role="table" aria-label={`${kind === "expense" ? "支出" : "收入"}分類排行`}>
           {ranked.map((r) => {

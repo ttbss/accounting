@@ -1075,3 +1075,49 @@ select.input {
 .search-input {
   margin-bottom: 12px;
 }
+
+/* ── 日／月／年 期間 ─────────────────────── */
+
+.period-label {
+  position: relative;
+  min-width: 8.5em;
+  cursor: pointer;
+}
+
+/* 疊在期間文字上的透明日期選擇器：點文字就開系統的選擇器 */
+.period-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.period-bar .segmented {
+  margin-bottom: 0;
+}
+
+.period-bar .segmented button {
+  padding: 5px 16px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field-row .input {
+  min-width: 0;
+}

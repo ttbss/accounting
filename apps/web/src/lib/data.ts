@@ -25,6 +25,8 @@ export interface TransactionInput {
   /** 只有轉帳才有，從轉出帳戶扣 */
   fee: number;
   date: string;
+  /** 當地時間 HH:MM，可以不填 */
+  time: string | null;
   /** 店家（選填，只有收支才有） */
   merchant_id: string | null;
   note: string;
@@ -226,18 +228,19 @@ export function useAccounts(ledgerId: string): Account[] | undefined {
   );
 }
 
-export function useMonthTransactions(ledgerId: string, month: string): Transaction[] | undefined {
+/** 新到舊：日期 → 時間（沒填時間的排在當天最後）→ 建立時間 */
+export function newestFirst(a: Transaction, b: Transaction): number {
+  return b.date.localeCompare(a.date) || (b.time ?? "").localeCompare(a.time ?? "") || b.created_at - a.created_at;
+}
+
+/** 某段日期（含頭尾）內的記帳紀錄，新到舊 */
+export function useRangeTransactions(ledgerId: string, start: string, end: string): Transaction[] | undefined {
   return useLiveQuery(
     async () =>
-      (
-        await db.transactions
-          .where("[ledger_id+date]")
-          .between([ledgerId, `${month}-01`], [ledgerId, `${month}-31`], true, true)
-          .toArray()
-      )
+      (await db.transactions.where("[ledger_id+date]").between([ledgerId, start], [ledgerId, end], true, true).toArray())
         .filter((t) => t.deleted_at === null)
-        .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at),
-    [ledgerId, month],
+        .sort(newestFirst),
+    [ledgerId, start, end],
   );
 }
 
@@ -333,7 +336,7 @@ export function useMerchantTransactions(ledgerId: string, merchantId: string): T
     async () =>
       (await db.transactions.where("[ledger_id+merchant_id]").equals([ledgerId, merchantId]).toArray())
         .filter((t) => t.deleted_at === null)
-        .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at),
+        .sort(newestFirst),
     [ledgerId, merchantId],
   );
 }
@@ -348,7 +351,7 @@ export function useAccountTransactions(ledgerId: string, accountId: string): Tra
     const byId = new Map([...from, ...to].map((t) => [t.id, t]));
     return [...byId.values()]
       .filter((t) => t.deleted_at === null)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at);
+      .sort(newestFirst);
   }, [ledgerId, accountId]);
 }
 

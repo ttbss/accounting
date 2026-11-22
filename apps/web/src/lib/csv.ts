@@ -1,4 +1,4 @@
-import { categoryInfo } from "./data";
+import { categoryInfo, newestFirst } from "./data";
 import { db } from "./db";
 import { todayStr } from "./format";
 
@@ -16,12 +16,13 @@ export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
 
   const rows = transactions
     .filter((t) => t.deleted_at === null)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at - b.created_at)
+    .sort((a, b) => newestFirst(b, a))
     .map((t) => {
       const transfer = t.kind === "transfer";
       const cat = categoryInfo(t.category_id, catById);
       return [
         t.date,
+        t.time ?? "",
         transfer ? "轉帳" : t.kind === "expense" ? "支出" : "收入",
         (t.amount / 100).toFixed(2),
         transfer ? "" : (cat.top?.name ?? "未分類"),
@@ -35,7 +36,7 @@ export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
     });
 
   // 轉帳：「帳戶」是轉出帳戶，手續費從轉出帳戶扣
-  const header = ["日期", "類型", "金額", "分類", "子分類", "帳戶", "轉入帳戶", "手續費", "店家", "備註"];
+  const header = ["日期", "時間", "類型", "金額", "分類", "子分類", "帳戶", "轉入帳戶", "手續費", "店家", "備註"];
   const csv = [header, ...rows].map((r) => r.map(escapeCell).join(",")).join("\r\n");
   const file = new File(["﻿" + csv], `記帳-${todayStr()}.csv`, { type: "text/csv;charset=utf-8" });
 

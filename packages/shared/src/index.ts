@@ -69,6 +69,11 @@ export const transactionSchema = z.object({
   fee: z.number().int().nonnegative().max(1e13),
   /** 當地日期 YYYY-MM-DD */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** 當地時間 HH:MM（選填；舊紀錄沒有） */
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .nullable(),
   /** 店家（選填，收支才有） */
   merchant_id: id.nullable(),
   note: z.string().max(500),
@@ -119,6 +124,7 @@ export const pushRequestSchema = z
             to_account_id: transactionSchema.shape.to_account_id.optional(),
             fee: transactionSchema.shape.fee.optional(),
             merchant_id: transactionSchema.shape.merchant_id.optional(),
+            time: transactionSchema.shape.time.optional(),
           })
           .refine((t) => t.kind !== "transfer" || t.to_account_id !== null, "轉帳要有轉入帳戶"),
       )

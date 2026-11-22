@@ -11,7 +11,7 @@ import {
   useNoteSuggestions,
 } from "../lib/data";
 import { getMeta, setMeta } from "../lib/db";
-import { amountToInput, formatMoney, parseAmount, parseBalance, todayStr } from "../lib/format";
+import { amountToInput, formatMoney, parseAmount, parseBalance, nowTimeStr, todayStr } from "../lib/format";
 import { Segmented, Sheet, toast } from "./ui";
 
 export function TransactionSheet({
@@ -45,6 +45,8 @@ export function TransactionSheet({
   const [merchantAuto, setMerchantAuto] = useState(!editing);
   const [browsing, setBrowsing] = useState(false);
   const [date, setDate] = useState(editing?.date ?? todayStr());
+  // 新的一筆預設現在時間；舊紀錄沒有時間就留空
+  const [time, setTime] = useState(editing ? (editing.time ?? "") : nowTimeStr());
   const [note, setNote] = useState(editing?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -180,6 +182,7 @@ export function TransactionSheet({
         to_account_id: toAccountId,
         fee: feeMinor,
         date,
+        time: /^\d{2}:\d{2}$/.test(time) ? time : null,
         merchant_id: merchantId,
         note,
       },
@@ -373,10 +376,16 @@ export function TransactionSheet({
           </div>
         )}
 
-        <label className="field">
-          <span className="label">日期</span>
-          <input className="input" type="date" value={date} required onChange={(e) => setDate(e.target.value || todayStr())} />
-        </label>
+        <div className="field-row">
+          <label className="field">
+            <span className="label">日期</span>
+            <input className="input" type="date" value={date} required onChange={(e) => setDate(e.target.value || todayStr())} />
+          </label>
+          <label className="field">
+            <span className="label">時間</span>
+            <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </label>
+        </div>
 
         {error && <div className="field-error">{error}</div>}
 

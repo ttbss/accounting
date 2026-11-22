@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import type { Transaction } from "@accounting/shared";
 import { relogin } from "./lib/api";
 import { getMeta, type Session } from "./lib/db";
-import { currentMonth } from "./lib/format";
+import { type Period, type PeriodUnit, todayStr } from "./lib/format";
 import { startAutoSync, syncNow } from "./lib/sync";
 import { AccountDetailPage, AccountsListPage } from "./components/AccountsTab";
 import { AccountsPage, CategoriesPage } from "./components/ManagePages";
@@ -64,7 +64,16 @@ function FirstRun() {
 function Main({ session }: { session: Session }) {
   const [tab, setTab] = useState<Tab>("list");
   const [sub, setSub] = useState<SubPage>(null);
-  const [month, setMonth] = useState(currentMonth);
+  // 每次打開都從今天開始，但記住上次看的是日／月／年
+  const [period, setPeriodState] = useState<Period>(() => ({ unit: loadPeriodUnit(), anchor: todayStr() }));
+  const setPeriod = useCallback((p: Period) => {
+    setPeriodState(p);
+    try {
+      localStorage.setItem("periodUnit", p.unit);
+    } catch {
+      /* 無痕模式等情況存不了，沒關係 */
+    }
+  }, []);
   const [sheet, setSheet] = useState<{ editing?: Transaction } | null>(null);
   /** 帳戶分頁裡正在看的帳戶 */
   const [openAccount, setOpenAccount] = useState<string | null>(null);
@@ -85,13 +94,13 @@ function Main({ session }: { session: Session }) {
         <TransactionsPage
           ledgerId={ledgerId}
           currency={currency}
-          month={month}
-          onMonthChange={setMonth}
+          period={period}
+          onPeriodChange={setPeriod}
           onEdit={(t) => setSheet({ editing: t })}
         />
       )}
       {tab === "overview" && (
-        <OverviewPage ledgerId={ledgerId} currency={currency} month={month} onMonthChange={setMonth} />
+        <OverviewPage ledgerId={ledgerId} currency={currency} period={period} onPeriodChange={setPeriod} />
       )}
       {tab === "accounts" && openAccount === null && (
         <AccountsListPage
@@ -151,6 +160,16 @@ function Main({ session }: { session: Session }) {
       <ToastHost />
     </div>
   );
+}
+
+function loadPeriodUnit(): PeriodUnit {
+  try {
+    const v = localStorage.getItem("periodUnit");
+    if (v === "day" || v === "month" || v === "year") return v;
+  } catch {
+    /* 讀不到就用預設 */
+  }
+  return "month";
 }
 
 function TabButton({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {

@@ -72,7 +72,7 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
       .bind(user.id, cursor, limit),
     db
       .prepare(
-        `SELECT id, ledger_id, kind, amount, category_id, account_id, to_account_id, fee, date, merchant_id, note,
+        `SELECT id, ledger_id, kind, amount, category_id, account_id, to_account_id, fee, date, time, merchant_id, note,
                 created_at, updated_at, deleted_at, rev FROM transactions
          WHERE ledger_id IN (${MEMBER_LEDGERS}) AND rev > ?2 ORDER BY rev LIMIT ?3`,
       )
@@ -229,14 +229,15 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
         .prepare(
           `INSERT INTO transactions
              (id, ledger_id, kind, amount, category_id, account_id, date, note, created_by, created_at, updated_at, deleted_at,
-              to_account_id, fee, merchant_id, rev)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, COALESCE(?14, 0), ?16, ${NEXT_REV})
+              to_account_id, fee, merchant_id, time, rev)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, COALESCE(?14, 0), ?16, ?18, ${NEXT_REV})
            ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind, amount = excluded.amount, category_id = excluded.category_id,
              account_id = excluded.account_id, date = excluded.date, note = excluded.note,
              to_account_id = CASE WHEN ?15 THEN excluded.to_account_id ELSE transactions.to_account_id END,
              fee = COALESCE(?14, transactions.fee),
              merchant_id = CASE WHEN ?17 THEN excluded.merchant_id ELSE transactions.merchant_id END,
+             time = CASE WHEN ?19 THEN excluded.time ELSE transactions.time END,
              updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, rev = excluded.rev
            WHERE excluded.updated_at >= transactions.updated_at AND transactions.ledger_id = excluded.ledger_id`,
         )
@@ -255,10 +256,12 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
           t.deleted_at,
           t.to_account_id ?? null,
           t.fee ?? null,
-          // 舊版手機沒帶 to_account_id / fee / merchant_id 時保留原值
+          // 舊版手機沒帶 to_account_id / fee / merchant_id / time 時保留原值
           t.to_account_id === undefined ? 0 : 1,
           t.merchant_id ?? null,
           t.merchant_id === undefined ? 0 : 1,
+          t.time ?? null,
+          t.time === undefined ? 0 : 1,
         ),
     );
   }

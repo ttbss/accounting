@@ -90,3 +90,68 @@ export function newId(): string {
   const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
+
+/** 現在的當地時間 HH:MM */
+export function nowTimeStr(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// ── 檢視期間：日／月／年 ─────────────────────────────────────────────
+
+export type PeriodUnit = "day" | "month" | "year";
+
+/** anchor 是期間內的某一天（YYYY-MM-DD） */
+export interface Period {
+  unit: PeriodUnit;
+  anchor: string;
+}
+
+function parseDate(date: string): Date {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(y, m - 1, d);
+}
+
+/** 期間的第一天和最後一天（含） */
+export function periodRange({ unit, anchor }: Period): [string, string] {
+  if (unit === "day") return [anchor, anchor];
+  if (unit === "month") return [`${anchor.slice(0, 7)}-01`, `${anchor.slice(0, 7)}-31`];
+  return [`${anchor.slice(0, 4)}-01-01`, `${anchor.slice(0, 4)}-12-31`];
+}
+
+export function shiftPeriod(p: Period, delta: number): Period {
+  const d = parseDate(p.anchor);
+  if (p.unit === "day") return { unit: "day", anchor: toDateStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta)) };
+  if (p.unit === "month") return { unit: "month", anchor: toDateStr(new Date(d.getFullYear(), d.getMonth() + delta, 1)) };
+  return { unit: "year", anchor: toDateStr(new Date(d.getFullYear() + delta, 0, 1)) };
+}
+
+/** 換成日／月／年：包含今天的話停在今天，不然停在原本期間的第一天 */
+export function changePeriodUnit(p: Period, unit: PeriodUnit): Period {
+  return { unit, anchor: isCurrentPeriod(p) ? todayStr() : periodRange(p)[0] };
+}
+
+export function isCurrentPeriod(p: Period): boolean {
+  const [start, end] = periodRange(p);
+  const today = todayStr();
+  return start <= today && today <= end;
+}
+
+/** 已經是今天／本月／今年（或之後）就不能再往後 */
+export function isLatestPeriod(p: Period): boolean {
+  return periodRange(p)[1] >= todayStr();
+}
+
+export function periodLabel({ unit, anchor }: Period): string {
+  const d = parseDate(anchor);
+  if (unit === "year") return `${d.getFullYear()} 年`;
+  if (unit === "month") return monthLabel(anchor.slice(0, 7));
+  const md = `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  if (anchor.slice(0, 4) !== todayStr().slice(0, 4)) return `${d.getFullYear()} 年 ${md}`;
+  return `${md} 週${WEEKDAYS[d.getDay()]}`;
+}
+
+/** 空白畫面用：「這一天」「這個月」「這一年」 */
+export function periodNoun(unit: PeriodUnit): string {
+  return unit === "day" ? "這一天" : unit === "month" ? "這個月" : "這一年";
+}
