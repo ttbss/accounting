@@ -40,6 +40,18 @@ export function OverviewPage({
   const rows = new Map<string, Row>();
   let total = 0;
   for (const t of transactions ?? []) {
+    // 轉帳本身不算收支，手續費算一筆「轉帳手續費」支出
+    if (t.kind === "transfer") {
+      const fee = t.fee ?? 0;
+      if (kind !== "expense" || fee === 0) continue;
+      total += fee;
+      const row = rows.get("_fee") ?? { id: "_fee", icon: "🏦", name: "轉帳手續費", amount: 0, count: 0, subs: new Map() };
+      row.amount += fee;
+      row.count += 1;
+      row.subs.set("_self", { name: "其他", amount: row.amount, count: row.count });
+      rows.set("_fee", row);
+      continue;
+    }
     if (t.kind !== kind) continue;
     total += t.amount;
     // 子分類併到上層分類統計

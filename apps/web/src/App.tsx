@@ -134,6 +134,7 @@ function Main({ session }: { session: Session }) {
         <TransactionSheet
           ledgerId={ledgerId}
           editing={sheet.editing}
+          currency={currency}
           defaultAccountId={tab === "accounts" ? (openAccount ?? undefined) : undefined}
           onClose={closeSheet}
         />

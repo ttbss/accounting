@@ -21,7 +21,10 @@ const timestamp = z.number().int().nonnegative();
 const deletedAt = timestamp.nullable();
 
 export const ACCOUNT_TYPES = ["cash", "bank", "credit_card", "e_wallet", "other"] as const;
+/** 分類的種類（也是一般收支紀錄的種類） */
 export const TRANSACTION_KINDS = ["expense", "income"] as const;
+/** 記帳紀錄的種類：收支之外還有轉帳（轉帳沒有分類） */
+export const ENTRY_KINDS = [...TRANSACTION_KINDS, "transfer"] as const;
 
 export const accountSchema = z.object({
   id,
@@ -53,13 +56,21 @@ export const categorySchema = z.object({
 export const transactionSchema = z.object({
   id,
   ledger_id: id,
-  kind: z.enum(TRANSACTION_KINDS),
-  /** 最小單位 ×100 的正整數 */
+  kind: z.enum(ENTRY_KINDS),
+  /** 最小單位 ×100 的正整數。轉帳時是轉入帳戶收到的金額。 */
   amount: z.number().int().nonnegative().max(1e13),
+  /** 轉帳時是 null */
   category_id: id.nullable(),
+  /** 轉帳時是轉出帳戶 */
   account_id: id.nullable(),
+  /** 只有轉帳才有：轉入帳戶 */
+  to_account_id: id.nullable(),
+  /** 只有轉帳才有：手續費，從轉出帳戶扣（轉出帳戶共減少 amount + fee） */
+  fee: z.number().int().nonnegative().max(1e13),
   /** 當地日期 YYYY-MM-DD */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** 店家（選填，收支才有）；空字串 = 沒填 */
+  merchant: z.string().max(100),
   note: z.string().max(500),
   created_at: timestamp,
   updated_at: timestamp,
@@ -81,6 +92,7 @@ export type Transaction = z.infer<typeof transactionSchema>;
 export type Ledger = z.infer<typeof ledgerSchema>;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
+export type EntryKind = (typeof ENTRY_KINDS)[number];
 
 /** 手機推送到伺服器的變更。帳本本身在第一版不從手機修改。 */
 export const pushRequestSchema = z
@@ -88,7 +100,17 @@ export const pushRequestSchema = z
     // 舊版手機不會帶新欄位；沒帶的話伺服器保留原本的值，不要蓋成預設值
     accounts: z.array(accountSchema.extend({ initial_balance: accountSchema.shape.initial_balance.optional() })).default([]),
     categories: z.array(categorySchema.extend({ parent_id: categorySchema.shape.parent_id.optional() })).default([]),
-    transactions: z.array(transactionSchema).default([]),
+    transactions: z
+      .array(
+        transactionSchema
+          .extend({
+            to_account_id: transactionSchema.shape.to_account_id.optional(),
+            fee: transactionSchema.shape.fee.optional(),
+            merchant: transactionSchema.shape.merchant.optional(),
+          })
+          .refine((t) => t.kind !== "transfer" || t.to_account_id !== null, "轉帳要有轉入帳戶"),
+      )
+      .default([]),
   })
   .refine(
     (p) => p.accounts.length + p.categories.length + p.transactions.length <= MAX_PUSH_ROWS,

@@ -1,4 +1,4 @@
-import type { Account, AccountType, Category, Transaction, TransactionKind } from "@accounting/shared";
+import type { Account, AccountType, Category, EntryKind, Transaction, TransactionKind } from "@accounting/shared";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type Local } from "./db";
 import { newId } from "./format";
@@ -15,11 +15,18 @@ function stamp(previous?: number): number {
 // ── 記帳紀錄 ──────────────────────────────────────────────────────────
 
 export interface TransactionInput {
-  kind: TransactionKind;
+  kind: EntryKind;
   amount: number;
   category_id: string | null;
+  /** 轉帳時是轉出帳戶 */
   account_id: string | null;
+  /** 只有轉帳才有 */
+  to_account_id: string | null;
+  /** 只有轉帳才有，從轉出帳戶扣 */
+  fee: number;
   date: string;
+  /** 店家（選填，只有收支才有） */
+  merchant: string;
   note: string;
 }
 
@@ -30,6 +37,11 @@ export async function saveTransaction(ledgerId: string, input: TransactionInput,
     id: existing?.id ?? newId(),
     ledger_id: ledgerId,
     ...input,
+    // 轉帳沒有分類；收支沒有轉入帳戶和手續費
+    category_id: input.kind === "transfer" ? null : input.category_id,
+    to_account_id: input.kind === "transfer" ? input.to_account_id : null,
+    fee: input.kind === "transfer" ? input.fee : 0,
+    merchant: input.kind === "transfer" ? "" : input.merchant.trim().slice(0, 100),
     note: input.note.trim(),
     created_at: existing?.created_at ?? now,
     updated_at: now,
@@ -214,15 +226,47 @@ export function useNoteSuggestions(ledgerId: string, categoryId: string | null):
   }, [ledgerId, categoryId]);
 }
 
-/** 某個帳戶的所有記帳紀錄（新到舊） */
+export interface MerchantInfo {
+  /** 所有用過的店家，最近用過的在前面 */
+  all: string[];
+  /** 每個分類（含子分類）上次用的店家 */
+  lastByCategory: Map<string, string>;
+}
+
+/** 店家清單：從記帳紀錄裡整理出來（店家直接存在每筆紀錄上） */
+export function useMerchants(ledgerId: string): MerchantInfo | undefined {
+  return useLiveQuery(async () => {
+    const rows = await db.transactions.where("ledger_id").equals(ledgerId).toArray();
+    const lastUsed = new Map<string, number>();
+    const lastByCategory = new Map<string, { merchant: string; at: number }>();
+    for (const t of rows) {
+      const merchant = (t.merchant ?? "").trim();
+      if (t.deleted_at !== null || !merchant) continue;
+      lastUsed.set(merchant, Math.max(lastUsed.get(merchant) ?? 0, t.updated_at));
+      if (t.category_id) {
+        const prev = lastByCategory.get(t.category_id);
+        if (!prev || t.updated_at > prev.at) lastByCategory.set(t.category_id, { merchant, at: t.updated_at });
+      }
+    }
+    return {
+      all: [...lastUsed.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m),
+      lastByCategory: new Map([...lastByCategory].map(([id, v]) => [id, v.merchant])),
+    };
+  }, [ledgerId]);
+}
+
+/** 某個帳戶的所有記帳紀錄（新到舊），包含轉入這個帳戶的轉帳 */
 export function useAccountTransactions(ledgerId: string, accountId: string): Transaction[] | undefined {
-  return useLiveQuery(
-    async () =>
-      (await db.transactions.where("[ledger_id+account_id]").equals([ledgerId, accountId]).toArray())
-        .filter((t) => t.deleted_at === null)
-        .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at),
-    [ledgerId, accountId],
-  );
+  return useLiveQuery(async () => {
+    const [from, to] = await Promise.all([
+      db.transactions.where("[ledger_id+account_id]").equals([ledgerId, accountId]).toArray(),
+      db.transactions.where("[ledger_id+to_account_id]").equals([ledgerId, accountId]).toArray(),
+    ]);
+    const byId = new Map([...from, ...to].map((t) => [t.id, t]));
+    return [...byId.values()]
+      .filter((t) => t.deleted_at === null)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at);
+  }, [ledgerId, accountId]);
 }
 
 /** 每個帳戶的目前餘額 = 初始金額 + 收入 − 支出 */
@@ -234,11 +278,38 @@ export function useAccountBalances(ledgerId: string): Map<string, number> | unde
     ]);
     const balances = new Map(accounts.map((a) => [a.id, a.initial_balance ?? 0]));
     for (const t of transactions) {
-      if (t.deleted_at !== null || !t.account_id || !balances.has(t.account_id)) continue;
-      balances.set(t.account_id, balances.get(t.account_id)! + (t.kind === "income" ? t.amount : -t.amount));
+      if (t.deleted_at !== null) continue;
+      for (const id of [t.account_id, t.to_account_id]) {
+        if (id && balances.has(id)) balances.set(id, balances.get(id)! + accountDelta(t, id));
+      }
     }
     return balances;
   }, [ledgerId]);
+}
+
+// ── 金額計算 ─────────────────────────────────────────────────────────
+
+/** 這筆對某個帳戶餘額的影響。轉帳：轉出帳戶 −(金額 + 手續費)，轉入帳戶 +金額。 */
+export function accountDelta(t: Transaction, accountId: string): number {
+  if (t.kind === "transfer") {
+    let delta = 0;
+    if (t.account_id === accountId) delta -= t.amount + (t.fee ?? 0);
+    if (t.to_account_id === accountId) delta += t.amount;
+    return delta;
+  }
+  if (t.account_id !== accountId) return 0;
+  return t.kind === "income" ? t.amount : -t.amount;
+}
+
+/** 整本帳本的收支：轉帳本身不算收入也不算支出，但手續費算支出 */
+export function expenseOf(t: Transaction): number {
+  if (t.kind === "expense") return t.amount;
+  if (t.kind === "transfer") return t.fee ?? 0;
+  return 0;
+}
+
+export function incomeOf(t: Transaction): number {
+  return t.kind === "income" ? t.amount : 0;
 }
 
 // ── 分類顯示 ─────────────────────────────────────────────────────────

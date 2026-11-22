@@ -16,19 +16,24 @@ export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
     .filter((t) => t.deleted_at === null)
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at - b.created_at)
     .map((t) => {
+      const transfer = t.kind === "transfer";
       const cat = categoryInfo(t.category_id, catById);
       return [
-      t.date,
-      t.kind === "expense" ? "支出" : "收入",
-      (t.amount / 100).toFixed(2),
-      cat.top?.name ?? "未分類",
-      cat.sub?.name ?? "",
-      (t.account_id && accName.get(t.account_id)) || "",
-      t.note,
+        t.date,
+        transfer ? "轉帳" : t.kind === "expense" ? "支出" : "收入",
+        (t.amount / 100).toFixed(2),
+        transfer ? "" : (cat.top?.name ?? "未分類"),
+        transfer ? "" : (cat.sub?.name ?? ""),
+        (t.account_id && accName.get(t.account_id)) || "",
+        (t.to_account_id && accName.get(t.to_account_id)) || "",
+        t.fee ? (t.fee / 100).toFixed(2) : "",
+        t.merchant ?? "",
+        t.note,
       ];
     });
 
-  const header = ["日期", "類型", "金額", "分類", "子分類", "帳戶", "備註"];
+  // 轉帳：「帳戶」是轉出帳戶，手續費從轉出帳戶扣
+  const header = ["日期", "類型", "金額", "分類", "子分類", "帳戶", "轉入帳戶", "手續費", "店家", "備註"];
   const csv = [header, ...rows].map((r) => r.map(escapeCell).join(",")).join("\r\n");
   const file = new File(["﻿" + csv], `記帳-${todayStr()}.csv`, { type: "text/csv;charset=utf-8" });
 

@@ -60,6 +60,32 @@ class AppDB extends Dexie {
             if (a.initial_balance === undefined) a.initial_balance = 0;
           });
       });
+    // v3：轉帳（transactions.to_account_id、fee）
+    this.version(3)
+      .stores({
+        transactions:
+          "id, ledger_id, dirty, [ledger_id+date], [ledger_id+category_id], [ledger_id+account_id], [ledger_id+to_account_id]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("transactions")
+          .toCollection()
+          .modify((t: Partial<Transaction>) => {
+            if (t.to_account_id === undefined) t.to_account_id = null;
+            if (t.fee === undefined) t.fee = 0;
+          });
+      });
+    // v4：店家（transactions.merchant）
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table("transactions")
+          .toCollection()
+          .modify((t: Partial<Transaction>) => {
+            if (t.merchant === undefined) t.merchant = "";
+          });
+      });
   }
 }
 

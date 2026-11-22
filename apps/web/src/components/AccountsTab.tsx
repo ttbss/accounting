@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Account, Transaction } from "@accounting/shared";
-import { useAccountBalances, useAccountTransactions, useAccounts, useCategories } from "../lib/data";
+import { accountDelta, useAccountBalances, useAccountTransactions, useAccounts, useCategories } from "../lib/data";
 import { formatMoney, monthLabel } from "../lib/format";
 import { ACCOUNT_TYPE_LABELS, AccountSheet, ManageHeader } from "./ManagePages";
 import { TransactionGroups } from "./TransactionsPage";
@@ -90,17 +90,23 @@ export function AccountDetailPage({
 
   let income = 0;
   let expense = 0;
+  let transferIn = 0;
+  /** 轉出（含手續費） */
+  let transferOut = 0;
   const months = new Map<string, Transaction[]>();
   for (const t of transactions ?? []) {
-    if (t.kind === "income") income += t.amount;
-    else expense += t.amount;
+    const delta = accountDelta(t, accountId);
+    if (t.kind === "income") income += delta;
+    else if (t.kind === "expense") expense -= delta;
+    else if (delta > 0) transferIn += delta;
+    else transferOut -= delta;
     const m = t.date.slice(0, 7);
     const list = months.get(m) ?? [];
     list.push(t);
     months.set(m, list);
   }
   const initial = account.initial_balance ?? 0;
-  const balance = initial + income - expense;
+  const balance = initial + income - expense + transferIn - transferOut;
 
   return (
     <div className="page">
@@ -129,6 +135,16 @@ export function AccountDetailPage({
           <span>
             支出 <b>{formatMoney(expense, currency)}</b>
           </span>
+          {transferIn > 0 && (
+            <span>
+              轉入 <b>{formatMoney(transferIn, currency)}</b>
+            </span>
+          )}
+          {transferOut > 0 && (
+            <span>
+              轉出 <b>{formatMoney(transferOut, currency)}</b>
+            </span>
+          )}
           <span>
             共 <b>{transactions?.length ?? 0}</b> 筆
           </span>
@@ -138,7 +154,7 @@ export function AccountDetailPage({
       {transactions && transactions.length === 0 && <div className="empty">這個帳戶還沒有記帳紀錄。</div>}
 
       {[...months.entries()].map(([month, list]) => {
-        const net = list.reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
+        const net = list.reduce((s, t) => s + accountDelta(t, accountId), 0);
         return (
           <section key={month}>
             <div className="section-title month-title">
@@ -151,7 +167,7 @@ export function AccountDetailPage({
               accounts={accounts}
               currency={currency}
               onEdit={onEdit}
-              hideAccount
+              accountId={accountId}
             />
           </section>
         );

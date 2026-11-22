@@ -816,6 +816,24 @@ select.input {
   background: var(--accent-soft);
 }
 
+.chip:disabled {
+  opacity: 0.4;
+}
+
+.transfer-summary {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 14px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-amount.transfer {
+  color: var(--text-2);
+}
+
 .form-actions {
   display: flex;
   gap: 8px;
@@ -995,4 +1013,61 @@ select.input {
   display: flex;
   justify-content: space-between;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── 店家 ─────────────────── */
+
+.merchant-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.merchant-input .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.merchant-input .btn.small {
+  flex: none;
+  min-height: 48px;
+}
+
+.merchant-browser {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.merchant-list {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+.merchant-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  padding: 11px 10px;
+  text-align: left;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.merchant-option + .merchant-option {
+  border-top: 1px solid var(--line);
+}
+
+.merchant-option:active,
+.merchant-option[aria-selected="true"] {
+  background: var(--accent-soft);
+}
+
+.merchant-empty {
+  padding: 10px;
 }

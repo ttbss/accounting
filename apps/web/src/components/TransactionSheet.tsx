@@ -1,24 +1,27 @@
 import { type FormEvent, useEffect, useState } from "react";
-import type { Transaction, TransactionKind } from "@accounting/shared";
+import type { EntryKind, Transaction } from "@accounting/shared";
 import {
   deleteTransaction,
   saveCategory,
   saveTransaction,
   useAccounts,
   useCategories,
+  useMerchants,
   useNoteSuggestions,
 } from "../lib/data";
 import { getMeta, setMeta } from "../lib/db";
-import { amountToInput, parseAmount, todayStr } from "../lib/format";
+import { amountToInput, formatMoney, parseAmount, parseBalance, todayStr } from "../lib/format";
 import { Segmented, Sheet, toast } from "./ui";
 
 export function TransactionSheet({
   ledgerId,
   editing,
   defaultAccountId,
+  currency,
   onClose,
 }: {
   ledgerId: string;
+  currency: string;
   /** 有值 = 編輯；沒有 = 新增 */
   editing?: Transaction;
   /** 新增時預設的帳戶（從帳戶明細頁開啟時） */
@@ -28,10 +31,17 @@ export function TransactionSheet({
   const categories = useCategories(ledgerId);
   const accounts = useAccounts(ledgerId);
 
-  const [kind, setKind] = useState<TransactionKind>(editing?.kind ?? "expense");
+  const [kind, setKind] = useState<EntryKind>(editing?.kind ?? "expense");
+  const isTransfer = kind === "transfer";
   const [amount, setAmount] = useState(editing ? amountToInput(editing.amount) : "");
   const [categoryId, setCategoryId] = useState<string | null>(editing?.category_id ?? null);
   const [accountId, setAccountId] = useState<string | null>(editing?.account_id ?? defaultAccountId ?? null);
+  const [toAccountId, setToAccountId] = useState<string | null>(editing?.to_account_id ?? null);
+  const [fee, setFee] = useState(editing?.fee ? amountToInput(editing.fee) : "");
+  const [merchant, setMerchant] = useState(editing?.merchant ?? "");
+  /** true = 店家是自動帶入的（新增時），換子分類會跟著換；使用者自己改過就不再自動帶 */
+  const [merchantAuto, setMerchantAuto] = useState(!editing);
+  const [browsing, setBrowsing] = useState(false);
   const [date, setDate] = useState(editing?.date ?? todayStr());
   const [note, setNote] = useState(editing?.note ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +57,17 @@ export function TransactionSheet({
   const topCategories = (categories ?? []).filter((c) => c.kind === kind && !c.parent_id && visible(c));
   const subCategories = selectedTop ? (categories ?? []).filter((c) => c.parent_id === selectedTop.id && visible(c)) : [];
 
-  const visibleAccounts = (accounts ?? []).filter((a) => a.deleted_at === null || a.id === accountId);
+  const visibleAccounts = (accounts ?? []).filter(
+    (a) => a.deleted_at === null || a.id === accountId || (isTransfer && a.id === toAccountId),
+  );
+  const merchants = useMerchants(ledgerId);
+  const typedMerchant = merchant.trim();
+  const merchantSuggestions =
+    !merchantAuto && typedMerchant && !browsing
+      ? (merchants?.all ?? []).filter((m) => m !== typedMerchant && m.includes(typedMerchant)).slice(0, 12)
+      : [];
+
+  const accountName = (id: string | null) => accounts?.find((a) => a.id === id)?.name ?? "";
 
   // 這個分類以前記過的備註，最近用過的在前面；輸入時只留包含輸入文字的
   const allSuggestions = useNoteSuggestions(ledgerId, categoryId) ?? [];
@@ -63,20 +83,35 @@ export function TransactionSheet({
     });
   }, [accounts, editing, accountId]);
 
-  function changeKind(k: TransactionKind) {
+  function changeKind(k: EntryKind) {
     setKind(k);
+    setError(null);
     if (categoryId && categories?.find((c) => c.id === categoryId)?.kind !== k) setCategoryId(null);
+  }
+
+  function pickFrom(id: string) {
+    setAccountId(id);
+    if (id === toAccountId) setToAccountId(null);
+    setError(null);
   }
 
   function pickCategory(id: string) {
     setCategoryId(id);
     setError(null);
+    // 新增時：帶入上次在這個（子）分類用的店家
+    if (merchantAuto) setMerchant(merchants?.lastByCategory.get(id) ?? "");
   }
 
   /** 再點一次已選的子分類 = 取消子分類，只留上層 */
   function pickSub(id: string) {
-    setCategoryId(id === categoryId ? (selectedTop?.id ?? null) : id);
-    setError(null);
+    const next = id === categoryId ? (selectedTop?.id ?? null) : id;
+    if (next) pickCategory(next);
+  }
+
+  function chooseMerchant(m: string) {
+    setMerchant(m);
+    setMerchantAuto(false);
+    setBrowsing(false);
   }
 
   async function addSub() {
@@ -90,15 +125,43 @@ export function TransactionSheet({
     toast(`已新增子分類「${name}」`);
   }
 
+  /** 「現金 −$1,015 → 永豐銀行 +$1,000」，讓人確認手續費從哪裡扣 */
+  function transferSummary(): string | null {
+    const amt = parseAmount(amount);
+    const f = parseBalance(fee);
+    if (amt === null || f === null || !accountId || !toAccountId || accountId === toAccountId) return null;
+    return `${accountName(accountId)} −${formatMoney(amt + f, currency)} → ${accountName(toAccountId)} +${formatMoney(amt, currency)}`;
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     const minor = parseAmount(amount);
     if (minor === null) return setError("請輸入金額，例如 120 或 45.5");
-    if (!categoryId) return setError("請選擇分類");
+    let feeMinor = 0;
+    if (isTransfer) {
+      if (!accountId) return setError("請選擇轉出帳戶");
+      if (!toAccountId) return setError("請選擇轉入帳戶");
+      if (accountId === toAccountId) return setError("轉出和轉入不能是同一個帳戶");
+      const parsedFee = parseBalance(fee);
+      if (parsedFee === null) return setError("手續費格式不對，例如 15");
+      feeMinor = parsedFee;
+    } else if (!categoryId) {
+      return setError("請選擇分類");
+    }
     setSaving(true);
     await saveTransaction(
       ledgerId,
-      { kind, amount: minor, category_id: categoryId, account_id: accountId, date, note },
+      {
+        kind,
+        amount: minor,
+        category_id: categoryId,
+        account_id: accountId,
+        to_account_id: toAccountId,
+        fee: feeMinor,
+        date,
+        merchant,
+        note,
+      },
       editing?.id,
     );
     if (accountId) await setMeta("lastAccountId", accountId);
@@ -123,11 +186,12 @@ export function TransactionSheet({
           options={[
             { value: "expense", label: "支出" },
             { value: "income", label: "收入" },
+            { value: "transfer", label: "轉帳" },
           ]}
         />
 
         <label className="field">
-          <span className="label">金額</span>
+          <span className="label">{isTransfer ? "轉帳金額" : "金額"}</span>
           <input
             className={`input amount-input${kind === "income" ? " income" : ""}`}
             inputMode="decimal"
@@ -142,25 +206,46 @@ export function TransactionSheet({
           />
         </label>
 
-        <div className="field">
-          <span className="label">分類</span>
-          <div className="chip-grid">
-            {topCategories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="chip"
-                aria-pressed={c.id === selectedTop?.id}
-                onClick={() => pickCategory(c.id)}
-              >
-                <span className="chip-icon">{c.icon || "•"}</span>
-                {c.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        {isTransfer && (
+          <TransferFields
+            accounts={visibleAccounts}
+            fromId={accountId}
+            toId={toAccountId}
+            fee={fee}
+            onFrom={pickFrom}
+            onTo={(id) => {
+              setToAccountId(id);
+              setError(null);
+            }}
+            onFee={(v) => {
+              setFee(v);
+              setError(null);
+            }}
+            summary={transferSummary()}
+          />
+        )}
 
-        {selectedTop && (
+        {!isTransfer && (
+          <div className="field">
+            <span className="label">分類</span>
+            <div className="chip-grid">
+              {topCategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={c.id === selectedTop?.id}
+                  onClick={() => pickCategory(c.id)}
+                >
+                  <span className="chip-icon">{c.icon || "•"}</span>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isTransfer && selectedTop && (
           <div className="field">
             <span className="label">{selectedTop.name}的子分類</span>
             <div className="chip-row">
@@ -183,12 +268,57 @@ export function TransactionSheet({
           </div>
         )}
 
+        {!isTransfer && (
+          <div className="field">
+            <span className="label">店家（選填）</span>
+            <div className="merchant-input">
+              <input
+                className="input"
+                maxLength={100}
+                autoComplete="off"
+                placeholder="例如：全家、八方雲集"
+                value={merchant}
+                onChange={(e) => {
+                  setMerchant(e.target.value);
+                  setMerchantAuto(false);
+                }}
+              />
+              {merchant && (
+                <button type="button" className="icon-btn" aria-label="清除店家" onClick={() => chooseMerchant("")}>
+                  ×
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn small"
+                aria-expanded={browsing}
+                onClick={() => setBrowsing((b) => !b)}
+              >
+                {browsing ? "收起" : "瀏覽"}
+              </button>
+            </div>
+            {merchantAuto && merchant && selected && (
+              <div className="muted field-hint">上次在「{selected.name}」用的店家</div>
+            )}
+            {merchantSuggestions.length > 0 && (
+              <div className="suggest-row" style={{ margin: "8px 0 0" }} aria-label="用過的店家">
+                {merchantSuggestions.map((m) => (
+                  <button key={m} type="button" className="suggest" onClick={() => chooseMerchant(m)}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+            {browsing && <MerchantBrowser all={merchants?.all ?? []} current={merchant} onPick={chooseMerchant} />}
+          </div>
+        )}
+
         <label className="field">
           <span className="label">備註</span>
           <input
             className="input"
             maxLength={500}
-            placeholder="例如：便當、捷運"
+            placeholder={isTransfer ? "例如：繳卡費、儲值悠遊卡" : "例如：便當、捷運"}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
@@ -203,7 +333,7 @@ export function TransactionSheet({
           </div>
         )}
 
-        {visibleAccounts.length > 0 && (
+        {!isTransfer && visibleAccounts.length > 0 && (
           <div className="field">
             <span className="label">帳戶</span>
             <div className="chip-row">
@@ -241,5 +371,118 @@ export function TransactionSheet({
         </div>
       </form>
     </Sheet>
+  );
+}
+
+function TransferFields({
+  accounts,
+  fromId,
+  toId,
+  fee,
+  onFrom,
+  onTo,
+  onFee,
+  summary,
+}: {
+  accounts: { id: string; name: string }[];
+  fromId: string | null;
+  toId: string | null;
+  fee: string;
+  onFrom: (id: string) => void;
+  onTo: (id: string) => void;
+  onFee: (v: string) => void;
+  summary: string | null;
+}) {
+  if (accounts.length < 2) {
+    return <div className="field muted">轉帳需要至少兩個帳戶，請先到「設定 → 帳戶」新增。</div>;
+  }
+  return (
+    <>
+      <div className="field">
+        <span className="label">轉出帳戶</span>
+        <div className="chip-row">
+          {accounts.map((a) => (
+            <button key={a.id} type="button" className="chip" aria-pressed={a.id === fromId} onClick={() => onFrom(a.id)}>
+              {a.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field">
+        <span className="label">轉入帳戶</span>
+        <div className="chip-row">
+          {accounts.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className="chip"
+              aria-pressed={a.id === toId}
+              disabled={a.id === fromId}
+              onClick={() => onTo(a.id)}
+            >
+              {a.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="field">
+        <span className="label">手續費（從轉出帳戶扣，沒有就留空）</span>
+        <input
+          className="input"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="0"
+          value={fee}
+          onChange={(e) => onFee(e.target.value)}
+        />
+      </label>
+      {summary && <div className="transfer-summary">{summary}</div>}
+    </>
+  );
+}
+
+/** 所有用過的店家，最近用過的在最上面；可以搜尋 */
+function MerchantBrowser({
+  all,
+  current,
+  onPick,
+}: {
+  all: string[];
+  current: string;
+  onPick: (m: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const list = q.trim() ? all.filter((m) => m.includes(q.trim())) : all;
+  return (
+    <div className="merchant-browser">
+      {all.length === 0 ? (
+        <div className="muted merchant-empty">還沒有存過店家。在上面輸入店家名稱，存檔後就會出現在這裡。</div>
+      ) : (
+        <>
+          <input
+            className="input"
+            placeholder={`搜尋 ${all.length} 個店家`}
+            value={q}
+            autoComplete="off"
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <div className="merchant-list" role="listbox" aria-label="用過的店家">
+            {list.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="option"
+                aria-selected={m === current.trim()}
+                className="merchant-option"
+                onClick={() => onPick(m)}
+              >
+                {m}
+              </button>
+            ))}
+            {list.length === 0 && <div className="muted merchant-empty">找不到「{q.trim()}」</div>}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
