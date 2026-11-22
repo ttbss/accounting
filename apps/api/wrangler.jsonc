@@ -17,7 +17,7 @@
       "binding": "DB",
       "database_name": "accounting",
       // 部署前：執行 `npx wrangler d1 create accounting`，把拿到的 id 貼在這裡
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "bfc3804c-398a-4ab5-9d54-34fe127b673b",
       "migrations_dir": "migrations"
     }
   ],
