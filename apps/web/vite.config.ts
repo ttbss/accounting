@@ -7,6 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // 網站在 Cloudflare Access 後面；瀏覽器抓 manifest 預設不帶 cookie，會被擋而無法安裝
+      useCredentials: true,
       includeAssets: ["favicon.ico", "apple-touch-icon-180x180.png", "icon.svg"],
       manifest: {
         name: "記帳本",
@@ -29,8 +31,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
         navigateFallback: "/index.html",
-        // /api 一律走網路；/api/login 要讓 Cloudflare Access 有機會重新登入
-        navigateFallbackDenylist: [/^\/api\//],
+        // /api 一律走網路；/api/login 要讓 Cloudflare Access 有機會重新登入。
+        // /cdn-cgi/access/authorized 是 Access 登入後寫 cookie 的回呼，被 SW 換成首頁就會登入迴圈。
+        navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//],
       },
     }),
   ],
