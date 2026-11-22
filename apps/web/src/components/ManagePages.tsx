@@ -10,6 +10,7 @@ import {
   useAccounts,
   useCategories,
 } from "../lib/data";
+import { useBackLayer } from "../lib/back";
 import { amountToInput, formatMoney, parseBalance } from "../lib/format";
 import { Segmented, Sheet, toast } from "./ui";
 
@@ -69,6 +70,7 @@ export function CategoriesPage({ ledgerId, onBack }: { ledgerId: string; onBack:
   const childrenOf = (id: string) => all.filter((c) => c.parent_id === id);
 
   const open = openId ? all.find((c) => c.id === openId) : undefined;
+  useBackLayer(open !== undefined, () => setOpenId(null));
   if (open) {
     return (
       <SubcategoriesPage

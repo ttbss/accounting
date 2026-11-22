@@ -11,6 +11,7 @@ import {
   useMerchantTransactions,
   useMerchants,
 } from "../lib/data";
+import { useBackLayer } from "../lib/back";
 import { formatMoney, monthLabel } from "../lib/format";
 import { ManageHeader } from "./ManagePages";
 import { TransactionGroups } from "./TransactionsPage";
@@ -34,6 +35,7 @@ export function MerchantsPage({
   const [q, setQ] = useState("");
 
   const open = openId ? merchants?.byId.get(openId) : undefined;
+  useBackLayer(open !== undefined, () => setOpenId(null));
   if (open) {
     return (
       <MerchantDetailPage

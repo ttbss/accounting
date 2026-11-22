@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Transaction } from "@accounting/shared";
 import { relogin } from "./lib/api";
+import { useBackLayer } from "./lib/back";
 import { getMeta, type Session } from "./lib/db";
 import { type Period, type PeriodUnit, todayStr } from "./lib/format";
 import { startAutoSync, syncNow } from "./lib/sync";
@@ -87,6 +88,11 @@ function Main({ session }: { session: Session }) {
     setOpenAccount(null);
     window.scrollTo(0, 0);
   }
+
+  // 手機按返回：先關子頁面，再回到「明細」分頁，最後才離開 App
+  useBackLayer(tab !== "list", () => go("list"));
+  useBackLayer(sub !== null, () => setSub(null));
+  useBackLayer(openAccount !== null, () => setOpenAccount(null));
 
   return (
     <div className="app">

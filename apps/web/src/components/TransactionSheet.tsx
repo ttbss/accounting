@@ -10,6 +10,7 @@ import {
   useMerchants,
   useNoteSuggestions,
 } from "../lib/data";
+import { useBackLayer } from "../lib/back";
 import { getMeta, setMeta } from "../lib/db";
 import { amountToInput, formatMoney, parseAmount, parseBalance, nowTimeStr, todayStr } from "../lib/format";
 import { Segmented, Sheet, toast } from "./ui";
@@ -44,6 +45,8 @@ export function TransactionSheet({
   /** true = 店家是自動帶入的（新增時），換子分類會跟著換；使用者自己改過就不再自動帶 */
   const [merchantAuto, setMerchantAuto] = useState(!editing);
   const [browsing, setBrowsing] = useState(false);
+  // 店家清單打開時，按返回先收起清單
+  useBackLayer(browsing, () => setBrowsing(false));
   const [date, setDate] = useState(editing?.date ?? todayStr());
   // 新的一筆預設現在時間；舊紀錄沒有時間就留空
   const [time, setTime] = useState(editing ? (editing.time ?? "") : nowTimeStr());

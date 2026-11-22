@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { relogin } from "../lib/api";
+import { useBackLayer } from "../lib/back";
 import { getMeta } from "../lib/db";
 import {
   changePeriodUnit,
@@ -166,6 +167,8 @@ export function AuthBanner() {
 }
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  // 手機按返回 = 取消
+  useBackLayer(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
