@@ -49,22 +49,32 @@ export async function deleteTransaction(id: string): Promise<void> {
 
 // ── 分類 ─────────────────────────────────────────────────────────────
 
+/** parent_id 有值 = 子分類（只有一層）。回傳這筆分類的 id。 */
 export async function saveCategory(
   ledgerId: string,
-  input: { kind: TransactionKind; name: string; icon: string },
+  input: { kind: TransactionKind; name: string; icon: string; parent_id?: string | null },
   id?: string,
-): Promise<void> {
+): Promise<string> {
   const existing = id ? await db.categories.get(id) : undefined;
   const now = stamp(existing?.updated_at);
+  const parentId = input.parent_id ?? existing?.parent_id ?? null;
   let sortOrder = existing?.sort_order;
   if (sortOrder === undefined) {
     const siblings = await db.categories.where("ledger_id").equals(ledgerId).toArray();
-    sortOrder = Math.max(-1, ...siblings.filter((c) => c.kind === input.kind).map((c) => c.sort_order)) + 1;
+    sortOrder =
+      Math.max(
+        -1,
+        ...siblings
+          .filter((c) => c.kind === input.kind && (c.parent_id ?? null) === parentId && c.deleted_at === null)
+          .map((c) => c.sort_order),
+      ) + 1;
   }
+  const newCategoryId = existing?.id ?? newId();
   await db.categories.put({
-    id: existing?.id ?? newId(),
+    id: newCategoryId,
     ledger_id: ledgerId,
     kind: input.kind,
+    parent_id: parentId,
     name: input.name.trim(),
     icon: input.icon.trim(),
     sort_order: sortOrder,
@@ -74,13 +84,22 @@ export async function saveCategory(
     dirty: 1,
   });
   requestSync();
+  return newCategoryId;
 }
 
+/** 刪除分類；刪上層分類時，底下的子分類一起刪 */
 export async function deleteCategory(id: string): Promise<void> {
-  const existing = await db.categories.get(id);
-  if (!existing) return;
-  const now = stamp(existing.updated_at);
-  await db.categories.update(id, { deleted_at: now, updated_at: now, dirty: 1 });
+  await db.transaction("rw", db.categories, async () => {
+    const existing = await db.categories.get(id);
+    if (!existing) return;
+    const children = (await db.categories.where("ledger_id").equals(existing.ledger_id).toArray()).filter(
+      (c) => c.parent_id === id && c.deleted_at === null,
+    );
+    for (const c of [existing, ...children]) {
+      const now = stamp(c.updated_at);
+      await db.categories.update(c.id, { deleted_at: now, updated_at: now, dirty: 1 });
+    }
+  });
   requestSync();
 }
 
@@ -88,7 +107,7 @@ export async function deleteCategory(id: string): Promise<void> {
 
 export async function saveAccount(
   ledgerId: string,
-  input: { name: string; type: AccountType },
+  input: { name: string; type: AccountType; initial_balance: number },
   id?: string,
 ): Promise<void> {
   const existing = id ? await db.accounts.get(id) : undefined;
@@ -103,6 +122,7 @@ export async function saveAccount(
     ledger_id: ledgerId,
     name: input.name.trim(),
     type: input.type,
+    initial_balance: input.initial_balance,
     sort_order: sortOrder,
     created_at: existing?.created_at ?? now,
     updated_at: now,
@@ -177,4 +197,66 @@ export function usePendingCount(): number | undefined {
     ]);
     return counts.reduce((a, b) => a + b, 0);
   });
+}
+
+/** 某個分類用過的備註，最近用過的排最前面（同樣的備註只出現一次） */
+export function useNoteSuggestions(ledgerId: string, categoryId: string | null): string[] | undefined {
+  return useLiveQuery(async () => {
+    if (!categoryId) return [];
+    const rows = await db.transactions.where("[ledger_id+category_id]").equals([ledgerId, categoryId]).toArray();
+    const lastUsed = new Map<string, number>();
+    for (const t of rows) {
+      const note = t.note.trim();
+      if (t.deleted_at !== null || !note) continue;
+      lastUsed.set(note, Math.max(lastUsed.get(note) ?? 0, t.updated_at));
+    }
+    return [...lastUsed.entries()].sort((a, b) => b[1] - a[1]).map(([note]) => note);
+  }, [ledgerId, categoryId]);
+}
+
+/** 某個帳戶的所有記帳紀錄（新到舊） */
+export function useAccountTransactions(ledgerId: string, accountId: string): Transaction[] | undefined {
+  return useLiveQuery(
+    async () =>
+      (await db.transactions.where("[ledger_id+account_id]").equals([ledgerId, accountId]).toArray())
+        .filter((t) => t.deleted_at === null)
+        .sort((a, b) => b.date.localeCompare(a.date) || b.created_at - a.created_at),
+    [ledgerId, accountId],
+  );
+}
+
+/** 每個帳戶的目前餘額 = 初始金額 + 收入 − 支出 */
+export function useAccountBalances(ledgerId: string): Map<string, number> | undefined {
+  return useLiveQuery(async () => {
+    const [accounts, transactions] = await Promise.all([
+      db.accounts.where("ledger_id").equals(ledgerId).toArray(),
+      db.transactions.where("ledger_id").equals(ledgerId).toArray(),
+    ]);
+    const balances = new Map(accounts.map((a) => [a.id, a.initial_balance ?? 0]));
+    for (const t of transactions) {
+      if (t.deleted_at !== null || !t.account_id || !balances.has(t.account_id)) continue;
+      balances.set(t.account_id, balances.get(t.account_id)! + (t.kind === "income" ? t.amount : -t.amount));
+    }
+    return balances;
+  }, [ledgerId]);
+}
+
+// ── 分類顯示 ─────────────────────────────────────────────────────────
+
+export interface CategoryInfo {
+  /** 子分類沒設圖示時用上層的 */
+  icon: string;
+  /** 「餐飲 · 午餐」或「餐飲」 */
+  label: string;
+  /** 上層分類（統計用）；本身是上層分類時就是自己 */
+  top?: Category;
+  sub?: Category;
+}
+
+export function categoryInfo(categoryId: string | null, byId: Map<string, Category>): CategoryInfo {
+  const cat = categoryId ? byId.get(categoryId) : undefined;
+  if (!cat) return { icon: "•", label: "未分類" };
+  const parent = cat.parent_id ? byId.get(cat.parent_id) : undefined;
+  if (!parent) return { icon: cat.icon || "•", label: cat.name, top: cat };
+  return { icon: cat.icon || parent.icon || "•", label: `${parent.name} · ${cat.name}`, top: parent, sub: cat };
 }

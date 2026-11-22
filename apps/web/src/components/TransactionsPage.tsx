@@ -1,5 +1,5 @@
 import type { Account, Category, Transaction } from "@accounting/shared";
-import { useAccounts, useCategories, useMonthTransactions } from "../lib/data";
+import { categoryInfo, useAccounts, useCategories, useMonthTransactions } from "../lib/data";
 import { dayLabel, formatMoney } from "../lib/format";
 import { AuthBanner, MonthSwitcher, SyncPill } from "./ui";
 
@@ -51,16 +51,6 @@ export function TransactionsPage({
   const categories = useCategories(ledgerId);
   const accounts = useAccounts(ledgerId);
 
-  const catById = new Map<string, Category>((categories ?? []).map((c) => [c.id, c]));
-  const accById = new Map<string, Account>((accounts ?? []).map((a) => [a.id, a]));
-
-  const days = new Map<string, Transaction[]>();
-  for (const t of transactions ?? []) {
-    const list = days.get(t.date) ?? [];
-    list.push(t);
-    days.set(t.date, list);
-  }
-
   return (
     <div className="page">
       <header className="page-header">
@@ -80,6 +70,48 @@ export function TransactionsPage({
         </div>
       )}
 
+      {transactions && (
+        <TransactionGroups
+          transactions={transactions}
+          categories={categories}
+          accounts={accounts}
+          currency={currency}
+          onEdit={onEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 依日期分組的記帳清單（明細頁、帳戶明細頁共用） */
+export function TransactionGroups({
+  transactions,
+  categories,
+  accounts,
+  currency,
+  onEdit,
+  hideAccount = false,
+}: {
+  transactions: Transaction[];
+  categories: Category[] | undefined;
+  accounts: Account[] | undefined;
+  currency: string;
+  onEdit: (t: Transaction) => void;
+  /** 帳戶明細頁不用每筆都寫帳戶名稱 */
+  hideAccount?: boolean;
+}) {
+  const catById = new Map<string, Category>((categories ?? []).map((c) => [c.id, c]));
+  const accById = new Map<string, Account>((accounts ?? []).map((a) => [a.id, a]));
+
+  const days = new Map<string, Transaction[]>();
+  for (const t of transactions) {
+    const list = days.get(t.date) ?? [];
+    list.push(t);
+    days.set(t.date, list);
+  }
+
+  return (
+    <>
       {[...days.entries()].map(([date, list]) => {
         const net = list.reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
         return (
@@ -89,16 +121,16 @@ export function TransactionsPage({
               <span>{formatMoney(net, currency)}</span>
             </div>
             {list.map((t) => {
-              const cat = t.category_id ? catById.get(t.category_id) : undefined;
-              const acc = t.account_id ? accById.get(t.account_id) : undefined;
+              const cat = categoryInfo(t.category_id, catById);
+              const acc = !hideAccount && t.account_id ? accById.get(t.account_id) : undefined;
               const sub = [acc?.name, t.note].filter(Boolean).join(" · ");
               return (
                 <button key={t.id} className="tx-row" onClick={() => onEdit(t)}>
                   <span className="tx-icon" aria-hidden>
-                    {cat?.icon || "•"}
+                    {cat.icon}
                   </span>
                   <span className="tx-main">
-                    <div className="tx-title">{cat?.name ?? "未分類"}</div>
+                    <div className="tx-title">{cat.label}</div>
                     {sub && <div className="tx-sub">{sub}</div>}
                   </span>
                   <span className={`tx-amount${t.kind === "income" ? " income" : ""}`}>
@@ -111,6 +143,6 @@ export function TransactionsPage({
           </section>
         );
       })}
-    </div>
+    </>
   );
 }

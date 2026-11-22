@@ -21,6 +21,16 @@ export function parseAmount(input: string): number | null {
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
+/** 帳戶初始金額：可以是 0；空白當 0；格式不對回傳 null。正負號另外選。 */
+export function parseBalance(input: string): number | null {
+  const s = input.replace(/[,\s]/g, "");
+  if (s === "") return 0;
+  if (!/^\d+(\.\d{0,2})?$/.test(s)) return null;
+  const [int = "0", frac = ""] = s.split(".");
+  const value = Number(int) * 100 + Number(frac.padEnd(2, "0"));
+  return Number.isSafeInteger(value) && value <= 1e13 ? value : null;
+}
+
 export function amountToInput(minor: number): string {
   return minor % 100 === 0 ? String(minor / 100) : (minor / 100).toFixed(2);
 }

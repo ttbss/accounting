@@ -53,13 +53,13 @@ export async function pull(env: AppEnv, user: AuthUser, cursor: number): Promise
       .bind(user.id, cursor, limit),
     db
       .prepare(
-        `SELECT id, ledger_id, name, type, sort_order, created_at, updated_at, deleted_at, rev FROM accounts
+        `SELECT id, ledger_id, name, type, initial_balance, sort_order, created_at, updated_at, deleted_at, rev FROM accounts
          WHERE ledger_id IN (${MEMBER_LEDGERS}) AND rev > ?2 ORDER BY rev LIMIT ?3`,
       )
       .bind(user.id, cursor, limit),
     db
       .prepare(
-        `SELECT id, ledger_id, name, kind, icon, sort_order, created_at, updated_at, deleted_at, rev FROM categories
+        `SELECT id, ledger_id, name, kind, parent_id, icon, sort_order, created_at, updated_at, deleted_at, rev FROM categories
          WHERE ledger_id IN (${MEMBER_LEDGERS}) AND rev > ?2 ORDER BY rev LIMIT ?3`,
       )
       .bind(user.id, cursor, limit),
@@ -145,14 +145,27 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
     statements.push(
       db
         .prepare(
-          `INSERT INTO accounts (id, ledger_id, name, type, sort_order, created_by, created_at, updated_at, deleted_at, rev)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ${NEXT_REV})
+          `INSERT INTO accounts
+             (id, ledger_id, name, type, sort_order, created_by, created_at, updated_at, deleted_at, initial_balance, rev)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, COALESCE(?10, 0), ${NEXT_REV})
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name, type = excluded.type, sort_order = excluded.sort_order,
+             initial_balance = COALESCE(?10, accounts.initial_balance),
              updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, rev = excluded.rev
            WHERE excluded.updated_at >= accounts.updated_at AND accounts.ledger_id = excluded.ledger_id`,
         )
-        .bind(a.id, a.ledger_id, a.name, a.type, a.sort_order, user.id, a.created_at, clamp(a.updated_at), a.deleted_at),
+        .bind(
+          a.id,
+          a.ledger_id,
+          a.name,
+          a.type,
+          a.sort_order,
+          user.id,
+          a.created_at,
+          clamp(a.updated_at),
+          a.deleted_at,
+          a.initial_balance ?? null,
+        ),
     );
   }
 
@@ -160,14 +173,30 @@ export async function push(env: AppEnv, user: AuthUser, body: unknown): Promise<
     statements.push(
       db
         .prepare(
-          `INSERT INTO categories (id, ledger_id, name, kind, icon, sort_order, created_by, created_at, updated_at, deleted_at, rev)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ${NEXT_REV})
+          `INSERT INTO categories
+             (id, ledger_id, name, kind, icon, sort_order, created_by, created_at, updated_at, deleted_at, parent_id, rev)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ${NEXT_REV})
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name, kind = excluded.kind, icon = excluded.icon, sort_order = excluded.sort_order,
+             parent_id = CASE WHEN ?12 THEN excluded.parent_id ELSE categories.parent_id END,
              updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, rev = excluded.rev
            WHERE excluded.updated_at >= categories.updated_at AND categories.ledger_id = excluded.ledger_id`,
         )
-        .bind(c.id, c.ledger_id, c.name, c.kind, c.icon, c.sort_order, user.id, c.created_at, clamp(c.updated_at), c.deleted_at),
+        .bind(
+          c.id,
+          c.ledger_id,
+          c.name,
+          c.kind,
+          c.icon,
+          c.sort_order,
+          user.id,
+          c.created_at,
+          clamp(c.updated_at),
+          c.deleted_at,
+          c.parent_id ?? null,
+          // 舊版手機沒帶 parent_id（undefined）時保留原值；帶 null 表示「改成上層分類」
+          c.parent_id === undefined ? 0 : 1,
+        ),
     );
   }
 

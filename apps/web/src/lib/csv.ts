@@ -1,3 +1,4 @@
+import { categoryInfo } from "./data";
 import { db } from "./db";
 import { todayStr } from "./format";
 
@@ -8,22 +9,26 @@ export async function exportCsv(ledgerId: string): Promise<{ count: number }> {
     db.categories.where("ledger_id").equals(ledgerId).toArray(),
     db.accounts.where("ledger_id").equals(ledgerId).toArray(),
   ]);
-  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const catById = new Map(categories.map((c) => [c.id, c]));
   const accName = new Map(accounts.map((a) => [a.id, a.name]));
 
   const rows = transactions
     .filter((t) => t.deleted_at === null)
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at - b.created_at)
-    .map((t) => [
+    .map((t) => {
+      const cat = categoryInfo(t.category_id, catById);
+      return [
       t.date,
       t.kind === "expense" ? "支出" : "收入",
       (t.amount / 100).toFixed(2),
-      (t.category_id && catName.get(t.category_id)) || "未分類",
+      cat.top?.name ?? "未分類",
+      cat.sub?.name ?? "",
       (t.account_id && accName.get(t.account_id)) || "",
       t.note,
-    ]);
+      ];
+    });
 
-  const header = ["日期", "類型", "金額", "分類", "帳戶", "備註"];
+  const header = ["日期", "類型", "金額", "分類", "子分類", "帳戶", "備註"];
   const csv = [header, ...rows].map((r) => r.map(escapeCell).join(",")).join("\r\n");
   const file = new File(["﻿" + csv], `記帳-${todayStr()}.csv`, { type: "text/csv;charset=utf-8" });
 

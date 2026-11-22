@@ -23,6 +23,10 @@ const DEFAULT_INCOME_CATEGORIES: [string, string][] = [
   ["💰", "其他收入"],
 ];
 
+const DEFAULT_SUBCATEGORIES: Record<string, string[]> = {
+  餐飲: ["早餐", "午餐", "晚餐", "點心零嘴"],
+};
+
 const DEFAULT_ACCOUNTS: [string, string][] = [
   ["現金", "cash"],
   ["銀行帳戶", "bank"],
@@ -86,6 +90,22 @@ export async function ensureDefaultLedger(env: AppEnv, user: AuthUser): Promise<
         )
         .bind(`${ledgerId}-cat-${String(i + 1).padStart(2, "0")}`, ledgerId, c.name, c.kind, c.icon, i, user.id, now, now),
     );
+  });
+
+  // 預設子分類：id 由上層分類 id 推算（和 migration 0002 的規則相同）
+  categories.forEach((c, i) => {
+    const parentId = `${ledgerId}-cat-${String(i + 1).padStart(2, "0")}`;
+    (DEFAULT_SUBCATEGORIES[c.name] ?? []).forEach((name, j) => {
+      statements.push(
+        db
+          .prepare(
+            `INSERT OR IGNORE INTO categories
+               (id, ledger_id, name, kind, icon, sort_order, created_by, created_at, updated_at, deleted_at, parent_id, rev)
+             VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, NULL, ?, ${NEXT_REV})`,
+          )
+          .bind(`${parentId}-sub-${String(j + 1).padStart(2, "0")}`, ledgerId, name, c.kind, j, user.id, now, now, parentId),
+      );
+    });
   });
 
   DEFAULT_ACCOUNTS.forEach(([name, type], i) => {

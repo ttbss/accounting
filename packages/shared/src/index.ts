@@ -28,6 +28,8 @@ export const accountSchema = z.object({
   ledger_id: id,
   name: z.string().trim().min(1).max(50),
   type: z.enum(ACCOUNT_TYPES),
+  /** 初始金額，最小單位 ×100，可以是負數（例如信用卡欠款） */
+  initial_balance: z.number().int().min(-1e13).max(1e13),
   sort_order: z.number().int(),
   created_at: timestamp,
   updated_at: timestamp,
@@ -39,6 +41,8 @@ export const categorySchema = z.object({
   ledger_id: id,
   name: z.string().trim().min(1).max(50),
   kind: z.enum(TRANSACTION_KINDS),
+  /** 上層分類 id；null = 本身就是上層分類。只有一層，子分類的 kind 跟上層相同。 */
+  parent_id: id.nullable(),
   icon: z.string().max(16),
   sort_order: z.number().int(),
   created_at: timestamp,
@@ -81,8 +85,9 @@ export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 /** 手機推送到伺服器的變更。帳本本身在第一版不從手機修改。 */
 export const pushRequestSchema = z
   .object({
-    accounts: z.array(accountSchema).default([]),
-    categories: z.array(categorySchema).default([]),
+    // 舊版手機不會帶新欄位；沒帶的話伺服器保留原本的值，不要蓋成預設值
+    accounts: z.array(accountSchema.extend({ initial_balance: accountSchema.shape.initial_balance.optional() })).default([]),
+    categories: z.array(categorySchema.extend({ parent_id: categorySchema.shape.parent_id.optional() })).default([]),
     transactions: z.array(transactionSchema).default([]),
   })
   .refine(

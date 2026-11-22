@@ -5,6 +5,7 @@ import { relogin } from "./lib/api";
 import { getMeta, type Session } from "./lib/db";
 import { currentMonth } from "./lib/format";
 import { startAutoSync, syncNow } from "./lib/sync";
+import { AccountDetailPage, AccountsListPage } from "./components/AccountsTab";
 import { AccountsPage, CategoriesPage } from "./components/ManagePages";
 import { OverviewPage } from "./components/OverviewPage";
 import { SettingsPage } from "./components/SettingsPage";
@@ -12,7 +13,7 @@ import { TransactionSheet } from "./components/TransactionSheet";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { ToastHost, useSyncState } from "./components/ui";
 
-type Tab = "list" | "overview" | "settings";
+type Tab = "list" | "overview" | "accounts" | "settings";
 type SubPage = "categories" | "accounts" | null;
 
 export function App() {
@@ -64,6 +65,8 @@ function Main({ session }: { session: Session }) {
   const [sub, setSub] = useState<SubPage>(null);
   const [month, setMonth] = useState(currentMonth);
   const [sheet, setSheet] = useState<{ editing?: Transaction } | null>(null);
+  /** 帳戶分頁裡正在看的帳戶 */
+  const [openAccount, setOpenAccount] = useState<string | null>(null);
   const closeSheet = useCallback(() => setSheet(null), []);
 
   const { ledgerId, currency } = session;
@@ -71,6 +74,7 @@ function Main({ session }: { session: Session }) {
   function go(t: Tab) {
     setTab(t);
     setSub(null);
+    setOpenAccount(null);
     window.scrollTo(0, 0);
   }
 
@@ -88,9 +92,28 @@ function Main({ session }: { session: Session }) {
       {tab === "overview" && (
         <OverviewPage ledgerId={ledgerId} currency={currency} month={month} onMonthChange={setMonth} />
       )}
+      {tab === "accounts" && openAccount === null && (
+        <AccountsListPage
+          ledgerId={ledgerId}
+          currency={currency}
+          onOpen={(id) => {
+            setOpenAccount(id);
+            window.scrollTo(0, 0);
+          }}
+        />
+      )}
+      {tab === "accounts" && openAccount !== null && (
+        <AccountDetailPage
+          ledgerId={ledgerId}
+          currency={currency}
+          accountId={openAccount}
+          onBack={() => setOpenAccount(null)}
+          onEdit={(t) => setSheet({ editing: t })}
+        />
+      )}
       {tab === "settings" && sub === null && <SettingsPage session={session} onOpen={setSub} />}
       {tab === "settings" && sub === "categories" && <CategoriesPage ledgerId={ledgerId} onBack={() => setSub(null)} />}
-      {tab === "settings" && sub === "accounts" && <AccountsPage ledgerId={ledgerId} onBack={() => setSub(null)} />}
+      {tab === "settings" && sub === "accounts" && <AccountsPage ledgerId={ledgerId} currency={currency} onBack={() => setSub(null)} />}
 
       {tab !== "settings" && (
         <button className="fab" aria-label="記一筆" onClick={() => setSheet({})}>
@@ -102,11 +125,19 @@ function Main({ session }: { session: Session }) {
         <div className="tabbar-inner">
           <TabButton icon="🧾" label="明細" active={tab === "list"} onClick={() => go("list")} />
           <TabButton icon="📊" label="總覽" active={tab === "overview"} onClick={() => go("overview")} />
+          <TabButton icon="💳" label="帳戶" active={tab === "accounts"} onClick={() => go("accounts")} />
           <TabButton icon="⚙️" label="設定" active={tab === "settings"} onClick={() => go("settings")} />
         </div>
       </nav>
 
-      {sheet && <TransactionSheet ledgerId={ledgerId} editing={sheet.editing} onClose={closeSheet} />}
+      {sheet && (
+        <TransactionSheet
+          ledgerId={ledgerId}
+          editing={sheet.editing}
+          defaultAccountId={tab === "accounts" ? (openAccount ?? undefined) : undefined}
+          onClose={closeSheet}
+        />
+      )}
       <ToastHost />
     </div>
   );

@@ -40,6 +40,26 @@ class AppDB extends Dexie {
       transactions: "id, ledger_id, dirty, [ledger_id+date]",
       meta: "key",
     });
+    // v2：子分類（categories.parent_id）、帳戶初始金額（accounts.initial_balance），
+    // 加上依分類 / 帳戶查記帳紀錄的索引
+    this.version(2)
+      .stores({
+        transactions: "id, ledger_id, dirty, [ledger_id+date], [ledger_id+category_id], [ledger_id+account_id]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("categories")
+          .toCollection()
+          .modify((c: Partial<Category>) => {
+            if (c.parent_id === undefined) c.parent_id = null;
+          });
+        await tx
+          .table("accounts")
+          .toCollection()
+          .modify((a: Partial<Account>) => {
+            if (a.initial_balance === undefined) a.initial_balance = 0;
+          });
+      });
   }
 }
 
