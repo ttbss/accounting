@@ -52,7 +52,11 @@ npm run dev
 3. 建立備份用的 R2 bucket（R2 需要先在 Cloudflare 綁定付款方式，免費額度內不收費）：
    `npx wrangler r2 bucket create accounting-backups`
 4. 部署（會先建置網頁、套用 migration）：`npm run deploy`
-5. 在 Cloudflare 後台 **Zero Trust → Access → Applications** 新增 Self-hosted 應用程式，網域填 Worker 的網址，Policy 只允許你的 email。記下 **Application Audience (AUD) Tag**。Worker 設定裡的 workers.dev 網址也要開啟 Access 保護。
+5. 設定 Cloudflare Access（只有你能登入）：
+   - **Workers & Pages → accounting → Settings → Domains & Routes**，在 `workers.dev` 那列選 **Enable Cloudflare Access**。記下跳出來的 **AUD Tag** 和 `xxx.cloudflareaccess.com` 網域。
+   - 一鍵開啟只會保護「preview URLs」。到 **Zero Trust → Access → Applications** 編輯這個應用程式，在 Destinations 加上正式網址（Public hostname：`accounting` + `<你的子網域>.workers.dev`）。
+   - 預設只能用 Cloudflare 帳號登入。到 **Zero Trust → Settings → Authentication** 新增 **One-time PIN**，並在應用程式的 Login methods 勾選它，手機才能用 email 驗證碼登入。
+   - Policy 設成 Allow，Include → Emails → 你的 email。
 6. 設定機密（不會進 git）：
    ```powershell
    cd apps/api
