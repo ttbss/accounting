@@ -7,6 +7,7 @@ import { getMeta, type Session } from "./lib/db";
 import { type Period, type PeriodUnit, todayStr } from "./lib/format";
 import { startAutoSync, syncNow } from "./lib/sync";
 import { AccountDetailPage, AccountsListPage } from "./components/AccountsTab";
+import { BankSyncPage } from "./components/BankSyncPage";
 import { AccountsPage, CategoriesPage } from "./components/ManagePages";
 import { MerchantsPage } from "./components/MerchantsPage";
 import { OverviewPage } from "./components/OverviewPage";
@@ -78,6 +79,8 @@ function Main({ session }: { session: Session }) {
   const [sheet, setSheet] = useState<{ editing?: Transaction } | null>(null);
   /** 帳戶分頁裡正在看的帳戶 */
   const [openAccount, setOpenAccount] = useState<string | null>(null);
+  /** 正在對帳（帳戶明細上面再開一層） */
+  const [bankSync, setBankSync] = useState(false);
   const closeSheet = useCallback(() => setSheet(null), []);
 
   const { ledgerId, currency } = session;
@@ -86,13 +89,18 @@ function Main({ session }: { session: Session }) {
     setTab(t);
     setSub(null);
     setOpenAccount(null);
+    setBankSync(false);
     window.scrollTo(0, 0);
   }
 
   // 手機按返回：先關子頁面，再回到「明細」分頁，最後才離開 App
   useBackLayer(tab !== "list", () => go("list"));
   useBackLayer(sub !== null, () => setSub(null));
-  useBackLayer(openAccount !== null, () => setOpenAccount(null));
+  useBackLayer(openAccount !== null, () => {
+    setOpenAccount(null);
+    setBankSync(false);
+  });
+  useBackLayer(bankSync, () => setBankSync(false));
 
   return (
     <div className="app">
@@ -118,13 +126,28 @@ function Main({ session }: { session: Session }) {
           }}
         />
       )}
-      {tab === "accounts" && openAccount !== null && (
+      {tab === "accounts" && openAccount !== null && bankSync && (
+        <BankSyncPage
+          ledgerId={ledgerId}
+          currency={currency}
+          accountId={openAccount}
+          onBack={() => {
+            setBankSync(false);
+            window.scrollTo(0, 0);
+          }}
+        />
+      )}
+      {tab === "accounts" && openAccount !== null && !bankSync && (
         <AccountDetailPage
           ledgerId={ledgerId}
           currency={currency}
           accountId={openAccount}
           onBack={() => setOpenAccount(null)}
           onEdit={(t) => setSheet({ editing: t })}
+          onBankSync={() => {
+            setBankSync(true);
+            window.scrollTo(0, 0);
+          }}
         />
       )}
       {tab === "settings" && sub === null && <SettingsPage session={session} onOpen={setSub} />}
@@ -139,7 +162,7 @@ function Main({ session }: { session: Session }) {
       )}
       {tab === "settings" && sub === "accounts" && <AccountsPage ledgerId={ledgerId} currency={currency} onBack={() => setSub(null)} />}
 
-      {tab !== "settings" && (
+      {tab !== "settings" && !bankSync && (
         <button className="fab" aria-label="記一筆" onClick={() => setSheet({})}>
           ＋
         </button>

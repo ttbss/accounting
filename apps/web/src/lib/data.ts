@@ -34,8 +34,13 @@ export interface TransactionInput {
 
 export async function saveTransaction(ledgerId: string, input: TransactionInput, id?: string): Promise<void> {
   const existing = id ? await db.transactions.get(id) : undefined;
+  await db.transactions.put(buildTransaction(ledgerId, input, existing));
+  requestSync();
+}
+
+function buildTransaction(ledgerId: string, input: TransactionInput, existing?: Transaction): Local<Transaction> {
   const now = stamp(existing?.updated_at);
-  await db.transactions.put({
+  return {
     id: existing?.id ?? newId(),
     ledger_id: ledgerId,
     ...input,
@@ -49,6 +54,42 @@ export async function saveTransaction(ledgerId: string, input: TransactionInput,
     updated_at: now,
     deleted_at: null,
     dirty: 1,
+  };
+}
+
+export interface BankSyncOps {
+  create: TransactionInput[];
+  update: { id: string; changes: Partial<Pick<Transaction, "date" | "time" | "amount" | "fee">> }[];
+  remove: string[];
+  /** 調整帳戶初始金額，讓餘額跟銀行一致 */
+  initialBalance?: { accountId: string; value: number };
+}
+
+/** 銀行對帳的結果一次寫入（全部成功或全部不寫） */
+export async function applyBankSync(ledgerId: string, ops: BankSyncOps): Promise<void> {
+  await db.transaction("rw", db.transactions, db.accounts, async () => {
+    await db.transactions.bulkPut(ops.create.map((input) => buildTransaction(ledgerId, input)));
+    for (const { id, changes } of ops.update) {
+      const existing = await db.transactions.get(id);
+      if (!existing || existing.deleted_at !== null) continue;
+      await db.transactions.update(id, { ...changes, updated_at: stamp(existing.updated_at), dirty: 1 });
+    }
+    for (const id of ops.remove) {
+      const existing = await db.transactions.get(id);
+      if (!existing || existing.deleted_at !== null) continue;
+      const now = stamp(existing.updated_at);
+      await db.transactions.update(id, { deleted_at: now, updated_at: now, dirty: 1 });
+    }
+    if (ops.initialBalance) {
+      const acc = await db.accounts.get(ops.initialBalance.accountId);
+      if (acc) {
+        await db.accounts.update(acc.id, {
+          initial_balance: ops.initialBalance.value,
+          updated_at: stamp(acc.updated_at),
+          dirty: 1,
+        });
+      }
+    }
   });
   requestSync();
 }

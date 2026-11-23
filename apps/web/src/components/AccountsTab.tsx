@@ -72,12 +72,15 @@ export function AccountDetailPage({
   accountId,
   onBack,
   onEdit,
+  onBankSync,
 }: {
   ledgerId: string;
   currency: string;
   accountId: string;
   onBack: () => void;
   onEdit: (t: Transaction) => void;
+  /** 打開「銀行對帳」頁 */
+  onBankSync: () => void;
 }) {
   const accounts = useAccounts(ledgerId);
   const categories = useCategories(ledgerId);
@@ -157,6 +160,11 @@ export function AccountDetailPage({
             共 <b>{transactions?.length ?? 0}</b> 筆
           </span>
         </div>
+        {account.deleted_at === null && account.type !== "cash" && (
+          <button className="btn small acct-sync-btn" onClick={onBankSync}>
+            🏦 匯入銀行對帳單
+          </button>
+        )}
       </div>
 
       {transactions && transactions.length === 0 && <div className="empty">這個帳戶還沒有記帳紀錄。</div>}
