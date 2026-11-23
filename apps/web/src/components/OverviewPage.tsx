@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useLayoutEffect } from "react";
 import type { TransactionKind } from "@accounting/shared";
 import { categoryInfo, useCategories, useRangeTransactions } from "../lib/data";
 import { formatMoney, type Period, periodNoun, periodRange, isLatestPeriod, shiftPeriod } from "../lib/format";
@@ -37,10 +37,12 @@ export function OverviewPage({
   const [start, end] = periodRange(period);
   const transactions = useRangeTransactions(ledgerId, start, end);
   // 左右滑動換到上一個／下一個期間
-  const { contentRef, swipeHandlers } = useSwipeNav(
+  const { contentRef, swipeHandlers, contentReady } = useSwipeNav(
     () => onPeriodChange(shiftPeriod(period, -1)),
     isLatestPeriod(period) ? null : () => onPeriodChange(shiftPeriod(period, 1)),
   );
+  // 新期間的資料畫好了才讓內容滑進來（不然會先看到舊資料一下）
+  useLayoutEffect(() => contentReady(), [transactions]);
   const categories = useCategories(ledgerId);
 
   const catById = new Map((categories ?? []).map((c) => [c.id, c]));

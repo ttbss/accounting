@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import type { Account, Category, Merchant, Transaction } from "@accounting/shared";
 import {
   accountDelta,
@@ -61,10 +62,12 @@ export function TransactionsPage({
   const [start, end] = periodRange(period);
   const transactions = useRangeTransactions(ledgerId, start, end);
   // 左右滑動換到上一個／下一個期間
-  const { contentRef, swipeHandlers } = useSwipeNav(
+  const { contentRef, swipeHandlers, contentReady } = useSwipeNav(
     () => onPeriodChange(shiftPeriod(period, -1)),
     isLatestPeriod(period) ? null : () => onPeriodChange(shiftPeriod(period, 1)),
   );
+  // 新期間的資料畫好了才讓內容滑進來（不然會先看到舊資料一下）
+  useLayoutEffect(() => contentReady(), [transactions]);
   const categories = useCategories(ledgerId);
   const accounts = useAccounts(ledgerId);
   const merchants = useMerchants(ledgerId);
