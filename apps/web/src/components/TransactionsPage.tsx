@@ -9,7 +9,8 @@ import {
   useMerchants,
   useRangeTransactions,
 } from "../lib/data";
-import { dayLabel, formatMoney, monthLabel, type Period, periodNoun, periodRange } from "../lib/format";
+import { dayLabel, formatMoney, monthLabel, type Period, periodNoun, periodRange, isLatestPeriod, shiftPeriod } from "../lib/format";
+import { useSwipeNav } from "../lib/swipe";
 import { AuthBanner, PeriodSwitcher, PeriodUnitBar, SyncPill } from "./ui";
 
 export function Totals({ transactions, currency }: { transactions: Transaction[]; currency: string }) {
@@ -59,50 +60,56 @@ export function TransactionsPage({
 }) {
   const [start, end] = periodRange(period);
   const transactions = useRangeTransactions(ledgerId, start, end);
+  // 左右滑動換到上一個／下一個期間
+  const { contentRef, swipeHandlers } = useSwipeNav(
+    () => onPeriodChange(shiftPeriod(period, -1)),
+    isLatestPeriod(period) ? null : () => onPeriodChange(shiftPeriod(period, 1)),
+  );
   const categories = useCategories(ledgerId);
   const accounts = useAccounts(ledgerId);
   const merchants = useMerchants(ledgerId);
 
   return (
-    <div className="page">
+    <div className="page swipe-page" {...swipeHandlers}>
       <header className="page-header">
         <PeriodSwitcher period={period} onChange={onPeriodChange} />
         <SyncPill />
       </header>
       <PeriodUnitBar period={period} onChange={onPeriodChange} />
       <AuthBanner />
+      <div ref={contentRef}>
+        {transactions && <Totals transactions={transactions} currency={currency} />}
 
-      {transactions && <Totals transactions={transactions} currency={currency} />}
+        {transactions && transactions.length === 0 && (
+          <div className="empty">
+            <div className="big">🧾</div>
+            {periodNoun(period.unit)}還沒有記帳。
+            <br />
+            點右下角的 ＋ 記第一筆。
+          </div>
+        )}
 
-      {transactions && transactions.length === 0 && (
-        <div className="empty">
-          <div className="big">🧾</div>
-          {periodNoun(period.unit)}還沒有記帳。
-          <br />
-          點右下角的 ＋ 記第一筆。
-        </div>
-      )}
-
-      {transactions &&
-        // 看整年的時候先分月份，比較好找
-        (period.unit === "year" ? byMonth(transactions) : [["", transactions] as const]).map(([month, list]) => (
-          <section key={month}>
-            {month && (
-              <div className="section-title month-title">
-                <span>{monthLabel(month)}</span>
-                <span>{formatMoney(list.reduce((s, t) => s + incomeOf(t) - expenseOf(t), 0), currency)}</span>
-              </div>
-            )}
-            <TransactionGroups
-              transactions={list}
-              categories={categories}
-              accounts={accounts}
-              merchantById={merchants?.byId}
-              currency={currency}
-              onEdit={onEdit}
-            />
-          </section>
-        ))}
+        {transactions &&
+          // 看整年的時候先分月份，比較好找
+          (period.unit === "year" ? byMonth(transactions) : [["", transactions] as const]).map(([month, list]) => (
+            <section key={month}>
+              {month && (
+                <div className="section-title month-title">
+                  <span>{monthLabel(month)}</span>
+                  <span>{formatMoney(list.reduce((s, t) => s + incomeOf(t) - expenseOf(t), 0), currency)}</span>
+                </div>
+              )}
+              <TransactionGroups
+                transactions={list}
+                categories={categories}
+                accounts={accounts}
+                merchantById={merchants?.byId}
+                currency={currency}
+                onEdit={onEdit}
+              />
+            </section>
+          ))}
+      </div>
     </div>
   );
 }

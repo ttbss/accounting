@@ -1121,3 +1121,11 @@ select.input {
 .field-row .input {
   min-width: 0;
 }
+
+/* 明細、總覽可以左右滑動換期間；上下捲動交給瀏覽器 */
+.swipe-page {
+  touch-action: pan-y;
+  /* 滑動時內容移出畫面，不要出現橫向捲軸 */
+  overflow-x: clip;
+  min-height: calc(100dvh - 120px);
+}
