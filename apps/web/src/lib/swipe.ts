@@ -11,8 +11,10 @@ import { type TouchEvent, useRef } from "react";
  *
  * 上下捲動優先：一開始比較偏上下的手勢就完全不管。
  */
-const OUT_MS = 140;
-const IN_MS = 200;
+const OUT_MS = 70;
+const IN_MS = 120;
+/** 一開始快、結尾慢下來，短時間內也看得出方向 */
+const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 /** 新資料一直沒來（例如查詢很慢）也不要讓畫面一直空白 */
 const READY_TIMEOUT_MS = 500;
 
@@ -27,7 +29,7 @@ export function useSwipeNav(onPrev: () => void, onNext: (() => void) | null) {
   function style(px: number, opacity: number, ms: number) {
     const el = contentRef.current;
     if (!el) return;
-    el.style.transition = ms ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : "none";
+    el.style.transition = ms ? `transform ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}` : "none";
     el.style.transform = px ? `translateX(${px}px)` : "";
     el.style.opacity = opacity === 1 ? "" : String(opacity);
   }
@@ -40,7 +42,7 @@ export function useSwipeNav(onPrev: () => void, onNext: (() => void) | null) {
     clearTimeout(p.timer);
     pending.current = null;
     // 先放到另一邊（看不見），強制排版一次，再滑回中間
-    style(p.from * 60, 0, 0);
+    style(p.from * 36, 0, 0);
     void contentRef.current?.offsetWidth;
     style(0, 1, IN_MS);
   }
@@ -55,7 +57,7 @@ export function useSwipeNav(onPrev: () => void, onNext: (() => void) | null) {
     }
     // 往右滑（上一個）：舊內容往右出去，新內容從左邊進來
     const out = direction === -1 ? 1 : -1;
-    style(out * (window.innerWidth / 3), 0, OUT_MS);
+    style(out * (window.innerWidth / 5), 0, OUT_MS);
     setTimeout(() => {
       change();
       pending.current = { from: (-out as 1 | -1), timer: setTimeout(slideIn, READY_TIMEOUT_MS) };
