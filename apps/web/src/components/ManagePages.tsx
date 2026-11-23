@@ -12,6 +12,7 @@ import {
 } from "../lib/data";
 import { useBackLayer } from "../lib/back";
 import { amountToInput, formatMoney, parseBalance } from "../lib/format";
+import { IconPicker } from "./IconPicker";
 import { Segmented, Sheet, toast } from "./ui";
 
 export function ManageHeader({
@@ -57,8 +58,6 @@ function OrderButtons({ onUp, onDown }: { onUp?: () => void; onDown?: () => void
 }
 
 // ── 分類 ─────────────────────────────────────────────────────────────
-
-const EMOJI_SUGGESTIONS = ["🍱", "☕", "🍜", "🚌", "🚕", "⛽", "🛍️", "👕", "🏠", "💡", "📱", "🎮", "🎬", "✈️", "🏥", "💊", "📚", "🎁", "🐶", "👶", "💄", "🏋️", "💼", "🎉", "📈", "💰", "📦"];
 
 type CategoryEditing = { category?: Category; parent?: Category } | null;
 
@@ -243,25 +242,7 @@ function CategorySheet({
             onChange={(e) => setName(e.target.value)}
           />
         </label>
-        <div className="field">
-          <label>
-            <span className="label">圖示{parent && "（可不填，會用上層分類的圖示）"}</span>
-            <input
-              className="input"
-              style={{ fontSize: 24, width: 80, textAlign: "center" }}
-              value={icon}
-              placeholder={parent?.icon}
-              onChange={(e) => setIcon(Array.from(e.target.value).slice(-2).join(""))}
-            />
-          </label>
-          <div className="emoji-row">
-            {EMOJI_SUGGESTIONS.map((em) => (
-              <button key={em} type="button" onClick={() => setIcon(em)} aria-label={`使用 ${em}`}>
-                {em}
-              </button>
-            ))}
-          </div>
-        </div>
+        <IconPicker value={icon} onChange={setIcon} fallback={parent ? parent.icon : undefined} />
         {error && <div className="field-error">{error}</div>}
         <div className="form-actions">
           {category && (
