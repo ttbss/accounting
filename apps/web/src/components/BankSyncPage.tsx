@@ -17,7 +17,7 @@ import {
   useAccounts,
   useCategories,
 } from "../lib/data";
-import { formatMoney } from "../lib/format";
+import { formatMoney, toDateStr } from "../lib/format";
 import { bankNote, type Draft, draftToInput, hasChanges, type Match, type Plan, reconcile, suggestDraft } from "../lib/reconcile";
 import { readSheetFile, SheetFormatError } from "../lib/sheet";
 import { ManageHeader } from "./ManagePages";
@@ -222,7 +222,12 @@ function Review({
     }
     return new Map(plan.creations.map((b) => [b.line, suggestDraft(b, transactions, accountId, accounts, categories, knownNumbers)]));
   });
-  const [createSel, setCreateSel] = useState<Set<number>>(() => new Set(plan.creations.map((b) => b.line)));
+  // 開始記這個帳戶（建立帳戶）之前的交易：當時的餘額已經算進初始金額，預設不匯入。
+  // 不然轉帳的另一邊（例如 ATM 提款轉進「現金」）會憑空多出錢。
+  const startDate = toDateStr(new Date(account.created_at));
+  const recent = plan.creations.filter((b) => b.date >= startDate);
+  const older = plan.creations.filter((b) => b.date < startDate);
+  const [createSel, setCreateSel] = useState<Set<number>>(() => new Set(recent.map((b) => b.line)));
   const [fixSel, setFixSel] = useState<Set<string>>(() => new Set(corrections.map((m) => m.tx.id)));
   const [removeSel, setRemoveSel] = useState<Set<string>>(() => new Set());
   const [adjustInitial, setAdjustInitial] = useState(true);
@@ -287,6 +292,30 @@ function Review({
     return next;
   };
 
+  const setLines = (set: Set<number>, rows: BankRow[], on: boolean) => {
+    const next = new Set(set);
+    for (const b of rows) {
+      if (on) next.add(b.line);
+      else next.delete(b.line);
+    }
+    return next;
+  };
+
+  const creationRow = (b: BankRow) => (
+    <CreationRow
+      key={b.line}
+      row={b}
+      draft={drafts.get(b.line)!}
+      onDraft={(d) => setDrafts(new Map(drafts).set(b.line, d))}
+      selected={createSel.has(b.line)}
+      onSelect={(on) => setCreateSel(toggle(createSel, b.line, on))}
+      accountId={accountId}
+      accounts={accounts}
+      categories={categories}
+      currency={currency}
+    />
+  );
+
   const txLabel = (t: Transaction) => {
     if (t.kind === "transfer") {
       const out = t.account_id === accountId;
@@ -321,8 +350,13 @@ function Review({
         </div>
         <div className="acct-stats">
           <span>
-            新增 <b>{plan.creations.length}</b>
+            新增 <b>{recent.length}</b>
           </span>
+          {older.length > 0 && (
+            <span>
+              記帳開始前 <b>{older.length}</b>
+            </span>
+          )}
           <span>
             更正 <b>{corrections.length}</b>
           </span>
@@ -346,29 +380,14 @@ function Review({
         </div>
       )}
 
-      {plan.creations.length > 0 && (
+      {recent.length > 0 && (
         <>
           <SectionTitle
-            title={`新增（銀行有、這裡沒有）${plan.creations.length} 筆`}
-            allOn={createSel.size === plan.creations.length}
-            onAll={(on) => setCreateSel(new Set(on ? plan.creations.map((b) => b.line) : []))}
+            title={`新增（銀行有、這裡沒有）${recent.length} 筆`}
+            allOn={recent.every((b) => createSel.has(b.line))}
+            onAll={(on) => setCreateSel(setLines(createSel, recent, on))}
           />
-          <div className="card list">
-            {plan.creations.map((b) => (
-              <CreationRow
-                key={b.line}
-                row={b}
-                draft={drafts.get(b.line)!}
-                onDraft={(d) => setDrafts(new Map(drafts).set(b.line, d))}
-                selected={createSel.has(b.line)}
-                onSelect={(on) => setCreateSel(toggle(createSel, b.line, on))}
-                accountId={accountId}
-                accounts={accounts}
-                categories={categories}
-                currency={currency}
-              />
-            ))}
-          </div>
+          <div className="card list">{recent.map(creationRow)}</div>
         </>
       )}
 
@@ -423,6 +442,21 @@ function Review({
               />
             ))}
           </div>
+        </>
+      )}
+
+      {older.length > 0 && (
+        <>
+          <SectionTitle
+            title={`記帳開始前（${shortDate(startDate)} 以前）${older.length} 筆`}
+            allOn={older.every((b) => createSel.has(b.line))}
+            onAll={(on) => setCreateSel(setLines(createSel, older, on))}
+          />
+          <p className="muted hint">
+            你從 {shortDate(startDate)} 開始記「{account.name}」，這些交易在那之前，當時的餘額已經算進初始金額，所以預設不匯入。
+            想補歷史紀錄才勾選；注意轉帳會連另一個帳戶（例如現金）的餘額一起改。
+          </p>
+          <div className="card list">{older.map(creationRow)}</div>
         </>
       )}
 
