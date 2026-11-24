@@ -5,8 +5,9 @@ import { usePendingCount } from "../lib/data";
 import type { Session } from "../lib/db";
 import { relativeTime } from "../lib/format";
 import { syncNow } from "../lib/sync";
+import { loadTheme, saveTheme, type ThemePref } from "../lib/theme";
 import { IconCloud, IconDownload, IconStore, IconSync, IconTag, IconUser, IconWallet } from "./icons";
-import { toast, useLastSyncAt, useSyncState, useTick } from "./ui";
+import { Segmented, toast, useLastSyncAt, useSyncState, useTick } from "./ui";
 
 export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p: "categories" | "accounts" | "merchants") => void }) {
   const state = useSyncState();
@@ -16,6 +17,7 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
 
   const [backup, setBackup] = useState<{ uploaded: string; bytes: number } | null | "unknown">("unknown");
   const [backingUp, setBackingUp] = useState(false);
+  const [theme, setTheme] = useState<ThemePref>(loadTheme);
 
   const loadBackup = useCallback(async () => {
     try {
@@ -129,6 +131,22 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
           <span className="chev">›</span>
         </button>
       </div>
+
+      <div className="section-title">外觀</div>
+      <Segmented
+        full
+        value={theme}
+        onChange={(t) => {
+          setTheme(t);
+          saveTheme(t);
+        }}
+        options={[
+          { value: "system", label: "跟隨系統" },
+          { value: "light", label: "淺色" },
+          { value: "dark", label: "深色" },
+        ]}
+      />
+      <p className="muted hint">只套用在這台裝置上。</p>
 
       <div className="section-title">帳號</div>
       <div className="card list">

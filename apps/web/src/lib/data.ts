@@ -329,6 +329,8 @@ export interface MerchantInfo {
   byId: Map<string, Merchant>;
   /** 每個分類（含子分類）上次用的店家 id（只算未刪除的店家） */
   lastByCategory: Map<string, string>;
+  /** 每個分類（含子分類）用過的店家 id，最近用過的在前面（只算未刪除的店家） */
+  byCategory: Map<string, string[]>;
   stats: Map<string, MerchantStats>;
 }
 
@@ -340,7 +342,8 @@ export function useMerchants(ledgerId: string): MerchantInfo | undefined {
     ]);
     const byId = new Map(merchants.map((m) => [m.id, m as Merchant]));
     const stats = new Map<string, MerchantStats>();
-    const lastByCategory = new Map<string, { id: string; at: number }>();
+    /** 分類 → 店家 → 在這個分類最後一次用的時間 */
+    const usedInCategory = new Map<string, Map<string, number>>();
     for (const t of rows) {
       if (t.deleted_at !== null || !t.merchant_id) continue;
       const s = stats.get(t.merchant_id) ?? { count: 0, expense: 0, income: 0, lastUsed: 0, lastDate: "" };
@@ -352,8 +355,9 @@ export function useMerchants(ledgerId: string): MerchantInfo | undefined {
       stats.set(t.merchant_id, s);
       const m = byId.get(t.merchant_id);
       if (t.category_id && m && m.deleted_at === null) {
-        const prev = lastByCategory.get(t.category_id);
-        if (!prev || t.updated_at > prev.at) lastByCategory.set(t.category_id, { id: t.merchant_id, at: t.updated_at });
+        const used = usedInCategory.get(t.category_id) ?? new Map<string, number>();
+        used.set(t.merchant_id, Math.max(used.get(t.merchant_id) ?? 0, t.updated_at));
+        usedInCategory.set(t.category_id, used);
       }
     }
     const list = merchants
@@ -362,10 +366,14 @@ export function useMerchants(ledgerId: string): MerchantInfo | undefined {
         (a, b) =>
           (stats.get(b.id)?.lastUsed ?? 0) - (stats.get(a.id)?.lastUsed ?? 0) || b.created_at - a.created_at,
       );
+    const byCategory = new Map(
+      [...usedInCategory].map(([cat, used]) => [cat, [...used].sort((a, b) => b[1] - a[1]).map(([id]) => id)]),
+    );
     return {
       list,
       byId,
-      lastByCategory: new Map([...lastByCategory].map(([cat, v]) => [cat, v.id])),
+      lastByCategory: new Map([...byCategory].map(([cat, ids]) => [cat, ids[0]!])),
+      byCategory,
       stats,
     };
   }, [ledgerId]);

@@ -69,6 +69,10 @@ export function TransactionSheet({
   );
   const merchants = useMerchants(ledgerId);
   const merchantNames = (merchants?.list ?? []).map((m) => m.name);
+  // 瀏覽店家時：這個（子）分類用過的店家排最前面，依最近在這個分類用的順序
+  const categoryMerchantNames = categoryId
+    ? (merchants?.byCategory.get(categoryId) ?? []).flatMap((id) => merchants?.byId.get(id)?.name ?? [])
+    : [];
   const typedMerchant = merchant.trim();
   const merchantSuggestions =
     !merchantAuto && typedMerchant && !browsing
@@ -336,7 +340,15 @@ export function TransactionSheet({
                 ))}
               </div>
             )}
-            {browsing && <MerchantBrowser all={merchantNames} current={merchant} onPick={chooseMerchant} />}
+            {browsing && (
+              <MerchantBrowser
+                all={merchantNames}
+                recent={categoryMerchantNames}
+                recentLabel={selected?.name}
+                current={merchant}
+                onPick={chooseMerchant}
+              />
+            )}
           </div>
         )}
 
@@ -474,18 +486,41 @@ function TransferFields({
   );
 }
 
-/** 所有用過的店家，最近用過的在最上面；可以搜尋 */
+/**
+ * 所有用過的店家，可以搜尋。
+ * 選了分類時，在這個（子）分類用過的店家排最前面（最近用的在上面），其他店家接在後面（最近用過的在上面）。
+ */
 function MerchantBrowser({
   all,
+  recent,
+  recentLabel,
   current,
   onPick,
 }: {
   all: string[];
+  /** 這個分類用過的店家，最近的在前面 */
+  recent: string[];
+  recentLabel?: string;
   current: string;
   onPick: (m: string) => void;
 }) {
   const [q, setQ] = useState("");
-  const list = q.trim() ? all.filter((m) => m.includes(q.trim())) : all;
+  const match = (m: string) => !q.trim() || m.includes(q.trim());
+  const recentSet = new Set(recent);
+  const top = recent.filter(match);
+  const rest = all.filter((m) => !recentSet.has(m) && match(m));
+  const option = (m: string) => (
+    <button
+      key={m}
+      type="button"
+      role="option"
+      aria-selected={m === current.trim()}
+      className="merchant-option"
+      onClick={() => onPick(m)}
+    >
+      {m}
+    </button>
+  );
   return (
     <div className="merchant-browser">
       {all.length === 0 ? (
@@ -500,19 +535,19 @@ function MerchantBrowser({
             onChange={(e) => setQ(e.target.value)}
           />
           <div className="merchant-list" role="listbox" aria-label="用過的店家">
-            {list.map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="option"
-                aria-selected={m === current.trim()}
-                className="merchant-option"
-                onClick={() => onPick(m)}
-              >
-                {m}
-              </button>
-            ))}
-            {list.length === 0 && <div className="muted merchant-empty">找不到「{q.trim()}」</div>}
+            {top.length > 0 && (
+              <div className="merchant-group" role="presentation">
+                {recentLabel ? `在「${recentLabel}」用過` : "這個分類用過"}
+              </div>
+            )}
+            {top.map(option)}
+            {top.length > 0 && rest.length > 0 && (
+              <div className="merchant-group" role="presentation">
+                其他店家
+              </div>
+            )}
+            {rest.map(option)}
+            {top.length + rest.length === 0 && <div className="muted merchant-empty">找不到「{q.trim()}」</div>}
           </div>
         </>
       )}

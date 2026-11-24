@@ -76,8 +76,10 @@
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 
+/* 深色：「跟隨系統」時看系統設定，設定頁選了「深色」時一律套用（data-theme 由 src/lib/theme.ts 設定）。
+ * 兩段的內容要保持一樣。 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #1a1714;
     --surface: #24201c;
@@ -107,6 +109,37 @@
     --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.45);
     --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1a1714;
+  --surface: #24201c;
+  --surface-2: #322c26;
+  --surface-3: #3d362f;
+  --text: #f1ebe2;
+  --text-2: #b8ad9f;
+  --muted: #847a6e;
+  --line: #332d27;
+  --border: rgba(255, 236, 214, 0.08);
+  --accent: #f08a60;
+  --accent-strong: #ffa37d;
+  --accent-ink: #1f1510;
+  --accent-soft: #42291c;
+  --bar: #f08a60;
+  --bar-track: #2f2924;
+  --income: #8ccb9a;
+  --income-soft: #22352a;
+  --danger: #f2826f;
+  --warn-bg: #3b2d10;
+  --warn-ink: #f5d38a;
+  --ok: #7cc48c;
+  --warn: #f0b94a;
+  --bad: #f07a68;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --shadow: none;
+  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -1449,6 +1482,22 @@ select.input {
 .merchant-option:active,
 .merchant-option[aria-selected="true"] {
   background: var(--accent-soft);
+}
+
+.merchant-group {
+  padding: var(--sp-3) 10px var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--accent-strong);
+  letter-spacing: 0.5px;
+}
+
+.merchant-group:first-child {
+  padding-top: var(--sp-1);
+}
+
+.merchant-group + .merchant-option {
+  border-top: 0;
 }
 
 .merchant-empty {
