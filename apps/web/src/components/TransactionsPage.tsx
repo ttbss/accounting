@@ -22,24 +22,25 @@ export function Totals({ transactions, currency }: { transactions: Transaction[]
     expense += expenseOf(t);
     income += incomeOf(t);
   }
+  const net = income - expense;
   return (
-    <div className="card kpi-row">
-      <div className="kpi">
-        <div className="kpi-label">支出</div>
-        <div className="kpi-value" title={formatMoney(expense, currency)}>
-          {formatMoney(expense, currency, true)}
-        </div>
+    <div className="summary">
+      <div className="summary-label">總支出</div>
+      <div className="summary-value" title={formatMoney(expense, currency)}>
+        {formatMoney(expense, currency, true)}
       </div>
-      <div className="kpi">
-        <div className="kpi-label">收入</div>
-        <div className="kpi-value income" title={formatMoney(income, currency)}>
-          {formatMoney(income, currency, true)}
+      <div className="summary-stats">
+        <div className="summary-stat">
+          <span>收入</span>
+          <b className="income" title={formatMoney(income, currency)}>
+            {formatMoney(income, currency, true)}
+          </b>
         </div>
-      </div>
-      <div className="kpi">
-        <div className="kpi-label">結餘</div>
-        <div className="kpi-value" title={formatMoney(income - expense, currency)}>
-          {formatMoney(income - expense, currency, true)}
+        <div className="summary-stat">
+          <span>結餘</span>
+          <b className={net < 0 ? "negative" : undefined} title={formatMoney(net, currency)}>
+            {formatMoney(net, currency, true)}
+          </b>
         </div>
       </div>
     </div>
@@ -85,9 +86,10 @@ export function TransactionsPage({
 
         {transactions && transactions.length === 0 && (
           <div className="empty">
-            <div className="big">🧾</div>
-            {periodNoun(period.unit)}還沒有記帳。
-            <br />
+            <div className="empty-icon" aria-hidden>
+              🧾
+            </div>
+            <div className="empty-title">{periodNoun(period.unit)}還沒有記帳</div>
             點右下角的 ＋ 記第一筆。
           </div>
         )}

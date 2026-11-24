@@ -6,7 +6,7 @@
     "dev": "vite --host",
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
-    "icons": "pwa-assets-generator",
+    "icons": "pwa-assets-generator && pwa-assets-generator --config pwa-assets.maskable.config.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {

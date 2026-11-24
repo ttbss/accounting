@@ -189,6 +189,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-grabber" aria-hidden />
         <div className="sheet-head">
           <button className="link-btn" onClick={onClose}>
             取消

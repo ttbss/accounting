@@ -9,6 +9,7 @@ import {
   useMerchants,
 } from "../lib/data";
 import { formatMoney, monthLabel } from "../lib/format";
+import { AccountBadge } from "./icons";
 import { ACCOUNT_TYPE_LABELS, AccountSheet, ManageHeader } from "./ManagePages";
 import { TransactionGroups } from "./TransactionsPage";
 import { AuthBanner, SyncPill } from "./ui";
@@ -40,7 +41,7 @@ export function AccountsListPage({
       <AuthBanner />
 
       {balances && (
-        <div className="card acct-hero">
+        <div className="card acct-hero acct-hero-main">
           <div className="acct-label">淨資產（所有帳戶合計）</div>
           <div className="acct-balance">
             <Money value={total} currency={currency} />
@@ -51,6 +52,7 @@ export function AccountsListPage({
       <div className="card list">
         {accounts.map((a) => (
           <button key={a.id} className="list-row" onClick={() => onOpen(a.id)}>
+            <AccountBadge type={a.type} />
             <span className="grow">
               <div>{a.name}</div>
               <div className="sub">{ACCOUNT_TYPE_LABELS[a.type]}</div>

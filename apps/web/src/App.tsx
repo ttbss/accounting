@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Transaction } from "@accounting/shared";
 import { relogin } from "./lib/api";
@@ -14,6 +14,7 @@ import { OverviewPage } from "./components/OverviewPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { TransactionSheet } from "./components/TransactionSheet";
 import { TransactionsPage } from "./components/TransactionsPage";
+import { IconChart, IconList, IconPlus, IconSliders, IconWallet } from "./components/icons";
 import { ToastHost, useSyncState } from "./components/ui";
 
 type Tab = "list" | "overview" | "accounts" | "settings";
@@ -34,6 +35,7 @@ function FirstRun() {
   return (
     <div className="center-screen">
       <img src="/icon.svg" alt="" />
+      <div className="center-title">記帳本</div>
       {state.kind === "offline" ? (
         <>
           <div>第一次使用需要連上網路</div>
@@ -170,16 +172,16 @@ function Main({ session }: { session: Session }) {
 
       {tab !== "settings" && !bankSync && (
         <button className="fab" aria-label="記一筆" onClick={() => setSheet({})}>
-          ＋
+          <IconPlus />
         </button>
       )}
 
       <nav className="tabbar">
         <div className="tabbar-inner">
-          <TabButton icon="🧾" label="明細" active={tab === "list"} onClick={() => go("list")} />
-          <TabButton icon="📊" label="總覽" active={tab === "overview"} onClick={() => go("overview")} />
-          <TabButton icon="💳" label="帳戶" active={tab === "accounts"} onClick={() => go("accounts")} />
-          <TabButton icon="⚙️" label="設定" active={tab === "settings"} onClick={() => go("settings")} />
+          <TabButton icon={<IconList />} label="明細" active={tab === "list"} onClick={() => go("list")} />
+          <TabButton icon={<IconChart />} label="總覽" active={tab === "overview"} onClick={() => go("overview")} />
+          <TabButton icon={<IconWallet />} label="帳戶" active={tab === "accounts"} onClick={() => go("accounts")} />
+          <TabButton icon={<IconSliders />} label="設定" active={tab === "settings"} onClick={() => go("settings")} />
         </div>
       </nav>
 
@@ -207,7 +209,7 @@ function loadPeriodUnit(): PeriodUnit {
   return "month";
 }
 
-function TabButton({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
+function TabButton({ icon, label, active, onClick }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
     <button className="tab" aria-current={active ? "page" : undefined} onClick={onClick}>
       <span className="tab-icon" aria-hidden>

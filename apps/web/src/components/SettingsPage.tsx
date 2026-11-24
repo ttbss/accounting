@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { api, AuthExpiredError, OfflineError, relogin } from "../lib/api";
 import { exportCsv } from "../lib/csv";
 import { usePendingCount } from "../lib/data";
 import type { Session } from "../lib/db";
 import { relativeTime } from "../lib/format";
 import { syncNow } from "../lib/sync";
+import { IconCloud, IconDownload, IconStore, IconSync, IconTag, IconUser, IconWallet } from "./icons";
 import { toast, useLastSyncAt, useSyncState, useTick } from "./ui";
 
 export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p: "categories" | "accounts" | "merchants") => void }) {
@@ -65,6 +66,7 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
       <div className="section-title">同步</div>
       <div className="card list">
         <div className="list-row">
+          <RowBadge icon={<IconSync />} />
           <div className="grow">
             <div>{syncText}</div>
             <div className="sub">{pending > 0 ? `${pending} 筆還沒同步到雲端` : "所有資料都已在雲端"}</div>
@@ -84,6 +86,7 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
       <div className="section-title">雲端備份</div>
       <div className="card list">
         <div className="list-row">
+          <RowBadge icon={<IconCloud />} />
           <div className="grow">
             <div>
               {backup === "unknown"
@@ -99,6 +102,7 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
           </button>
         </div>
         <button className="list-row" onClick={onExport}>
+          <RowBadge icon={<IconDownload />} />
           <div className="grow">
             <div>匯出 CSV</div>
             <div className="sub">所有記帳紀錄，可用 Excel 開啟</div>
@@ -110,14 +114,17 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
       <div className="section-title">管理</div>
       <div className="card list">
         <button className="list-row" onClick={() => onOpen("categories")}>
+          <RowBadge icon={<IconTag />} />
           <span className="grow">分類</span>
           <span className="chev">›</span>
         </button>
         <button className="list-row" onClick={() => onOpen("accounts")}>
+          <RowBadge icon={<IconWallet />} />
           <span className="grow">帳戶</span>
           <span className="chev">›</span>
         </button>
         <button className="list-row" onClick={() => onOpen("merchants")}>
+          <RowBadge icon={<IconStore />} />
           <span className="grow">店家</span>
           <span className="chev">›</span>
         </button>
@@ -126,10 +133,19 @@ export function SettingsPage({ session, onOpen }: { session: Session; onOpen: (p
       <div className="section-title">帳號</div>
       <div className="card list">
         <div className="list-row">
+          <RowBadge icon={<IconUser />} />
           <span className="grow">登入身分</span>
-          <span className="value">{session.email}</span>
+          <span className="value ellipsis">{session.email}</span>
         </div>
       </div>
     </div>
+  );
+}
+
+function RowBadge({ icon }: { icon: ReactNode }) {
+  return (
+    <span className="row-badge" aria-hidden>
+      {icon}
+    </span>
   );
 }

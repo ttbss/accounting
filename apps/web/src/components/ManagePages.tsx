@@ -12,6 +12,7 @@ import {
 } from "../lib/data";
 import { useBackLayer } from "../lib/back";
 import { amountToInput, formatMoney, parseBalance } from "../lib/format";
+import { AccountBadge } from "./icons";
 import { IconPicker } from "./IconPicker";
 import { Segmented, Sheet, toast } from "./ui";
 
@@ -292,6 +293,7 @@ export function AccountsPage({
         {list.map((a, i) => (
           <div key={a.id} className="list-row">
             <button className="grow list-row list-row-inner" onClick={() => setEditing(a)}>
+              <AccountBadge type={a.type} />
               <span className="grow">
                 <div>{a.name}</div>
                 <div className="sub">
