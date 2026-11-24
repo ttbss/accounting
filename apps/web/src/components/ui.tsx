@@ -92,19 +92,25 @@ export function PeriodSwitcher({ period, onChange }: { period: Period; onChange:
   );
 }
 
-/** 頁首下面那排：日／月／年，不在本期時可以一鍵回到今天 */
-export function PeriodUnitBar({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+const UNIT_LABELS: Record<PeriodUnit, string> = { day: "日", month: "月", year: "年" };
+
+/** 頁首下面那排：日／月／年（units 可以只列其中幾個），不在本期時可以一鍵回到今天 */
+export function PeriodUnitBar({
+  period,
+  onChange,
+  units = ["day", "month", "year"],
+}: {
+  period: Period;
+  onChange: (p: Period) => void;
+  units?: PeriodUnit[];
+}) {
   const back = period.unit === "day" ? "今天" : period.unit === "month" ? "本月" : "今年";
   return (
     <div className="period-bar">
       <Segmented
         value={period.unit}
         onChange={(u) => onChange(changePeriodUnit(period, u))}
-        options={[
-          { value: "day", label: "日" },
-          { value: "month", label: "月" },
-          { value: "year", label: "年" },
-        ]}
+        options={units.map((u) => ({ value: u, label: UNIT_LABELS[u] }))}
       />
       {!isCurrentPeriod(period) && (
         <button className="link-btn" onClick={() => onChange({ unit: period.unit, anchor: todayStr() })}>

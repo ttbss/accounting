@@ -494,26 +494,113 @@ button {
   border-radius: 0 4px 4px 0;
 }
 
-.rank-row.expandable {
+.rank-toggle {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.rank-subs {
-  margin-top: 8px;
-  padding-left: 28px;
+/* 點開分類後：子分類分組 + 每一筆 */
+.rank-detail {
+  margin-top: 10px;
 }
 
-.rank-sub {
+.rank-group + .rank-group {
+  margin-top: 10px;
+}
+
+.rank-group-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 5px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
   font-size: 14px;
 }
 
-.rank-sub .rank-name,
-.rank-sub .rank-amount {
-  font-weight: 400;
+.rank-group-head .rank-name,
+.rank-group-head .rank-amount {
+  font-weight: 600;
+}
+
+.rank-tx {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.rank-group-head + .rank-tx {
+  border-top: 0;
+}
+
+.rank-tx:active {
+  background: var(--surface-2);
+}
+
+.rank-tx-date {
+  flex: none;
+  width: 2.8em;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.rank-tx-date small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rank-tx-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rank-tx-title,
+.rank-tx-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-tx-title {
+  font-size: 14px;
+}
+
+.rank-tx-title.none {
+  color: var(--muted);
+}
+
+.rank-tx-sub {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.rank-tx-amount {
+  flex: none;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rank-tx-amount.income {
+  color: var(--income);
 }
 
 .section-title {

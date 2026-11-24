@@ -114,7 +114,13 @@ function Main({ session }: { session: Session }) {
         />
       )}
       {tab === "overview" && (
-        <OverviewPage ledgerId={ledgerId} currency={currency} period={period} onPeriodChange={setPeriod} />
+        <OverviewPage
+          ledgerId={ledgerId}
+          currency={currency}
+          period={period}
+          onPeriodChange={setPeriod}
+          onEdit={(t) => setSheet({ editing: t })}
+        />
       )}
       {tab === "accounts" && openAccount === null && (
         <AccountsListPage
