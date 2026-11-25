@@ -1,6 +1,6 @@
 import { MAX_PUSH_ROWS, type PullResponse } from "@accounting/shared";
 import { api, AuthExpiredError, OfflineError } from "./api";
-import { clearLocalData, db, getMeta, type Local, setMeta, SYNCED_TABLES } from "./db";
+import { clearLocalData, db, getMeta, type Local, type Session, setMeta, SYNCED_TABLES } from "./db";
 
 /**
  * 同步引擎：先推送本機改過的資料，再拉伺服器上的新資料。
@@ -61,9 +61,12 @@ export function requestSync(): void {
 async function runOnce(): Promise<void> {
   setState({ kind: "syncing" });
   try {
-    await ensureSession();
+    const newSession = await ensureSession();
     await pushAll();
     await pullAll();
+    // 第一次（或本機資料被清掉後）要等資料全部下載完才進帳本，
+    // 不然下載途中會看到一本空的帳本，像是資料都不見了
+    if (newSession) await setMeta("session", newSession);
     await setMeta("lastSyncAt", Date.now());
     setState({ kind: "idle" });
   } catch (err) {
@@ -73,20 +76,24 @@ async function runOnce(): Promise<void> {
   }
 }
 
-/** 第一次開啟（或換了帳號）時，向伺服器取得使用者與帳本 */
-async function ensureSession(): Promise<void> {
+/**
+ * 第一次開啟（或換了帳號）時，向伺服器取得使用者與帳本。
+ * 回傳要寫入的新 session；呼叫端等資料下載完才寫入（寫入後畫面才離開「正在準備你的帳本」）。
+ * 已經有同一個人的 session 就回傳 null。
+ */
+async function ensureSession(): Promise<Session | null> {
   const existing = await getMeta("session");
-  if (existing && !navigator.onLine) return;
+  if (existing && !navigator.onLine) return null;
   const me = await api.me();
-  if (existing && existing.userId === me.user.id) return;
+  if (existing && existing.userId === me.user.id) return null;
   if (existing) await clearLocalData(); // 換了帳號
   const ledger = me.ledgers.find((l) => l.id === me.defaultLedgerId);
-  await setMeta("session", {
+  return {
     userId: me.user.id,
     email: me.user.email,
     ledgerId: me.defaultLedgerId,
     currency: ledger?.currency ?? "TWD",
-  });
+  };
 }
 
 type AnyRow = Local<{ id: string; updated_at: number }>;
