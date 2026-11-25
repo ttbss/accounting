@@ -14,7 +14,7 @@ import { useBackLayer } from "../lib/back";
 import { amountToInput, formatMoney, parseBalance } from "../lib/format";
 import { AccountBadge } from "./icons";
 import { IconPicker } from "./IconPicker";
-import { Segmented, Sheet, toast } from "./ui";
+import { Segmented, Sheet, tintOf, toast } from "./ui";
 
 export function ManageHeader({
   title,
@@ -103,7 +103,7 @@ export function CategoriesPage({ ledgerId, onBack }: { ledgerId: string; onBack:
           return (
             <div key={c.id} className="list-row">
               <button className="grow list-row list-row-inner" onClick={() => setOpenId(c.id)}>
-                <span className="row-icon">{c.icon || "•"}</span>
+                <span className="row-icon" data-tint={tintOf(c.id)}>{c.icon || "•"}</span>
                 <span className="grow">
                   <div>{c.name}</div>
                   <div className="sub ellipsis">{subs.length > 0 ? subs.map((s) => s.name).join("、") : "沒有子分類"}</div>
@@ -156,7 +156,7 @@ function SubcategoriesPage({
         {subs.map((c, i) => (
           <div key={c.id} className="list-row">
             <button className="grow list-row list-row-inner" onClick={() => setEditing({ category: c, parent })}>
-              <span className="row-icon">{c.icon || parent.icon || "•"}</span>
+              <span className="row-icon" data-tint={tintOf(parent.id)}>{c.icon || parent.icon || "•"}</span>
               <span className="grow">{c.name}</span>
             </button>
             <OrderButtons

@@ -203,6 +203,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
+/** 分類圖示的淡色底：同一個分類永遠是同一個顏色（styles.css 的 [data-tint]） */
+export function tintOf(id: string | null | undefined): string {
+  if (!id) return "1";
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return String(Math.abs(h) % 6);
+}
+
 export function Segmented<T extends string>({
   value,
   options,

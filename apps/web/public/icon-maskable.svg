@@ -2,16 +2,19 @@
   <!-- Android maskable：背景滿版不透明，圖形都在中央直徑 409px 的安全圓內 -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#e2774b"/>
-      <stop offset="1" stop-color="#c8532c"/>
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <rect x="152" y="134" width="220" height="268" rx="30" fill="#9e3f1f" opacity="0.35"/>
-  <rect x="146" y="120" width="220" height="268" rx="30" fill="#fff8ee"/>
-  <path d="M176 120h22v268h-22a30 30 0 0 1-30-30V150a30 30 0 0 1 30-30z" fill="#f0d9bf"/>
-  <rect x="226" y="190" width="108" height="18" rx="9" fill="#2b2622"/>
-  <rect x="226" y="236" width="108" height="18" rx="9" fill="#dcc8b0"/>
-  <rect x="226" y="282" width="70" height="18" rx="9" fill="#dcc8b0"/>
-  <path d="M302 120h36v108l-18-15-18 15z" fill="#3d7a4c"/>
+  <g>
+    <rect x="158" y="132" width="196" height="268" rx="30" fill="#0f2f86" opacity="0.28"/>
+    <rect x="150" y="118" width="196" height="268" rx="30" fill="#ffffff"/>
+    <rect x="186" y="170" width="124" height="20" rx="10" fill="#2563eb"/>
+    <rect x="186" y="218" width="124" height="20" rx="10" fill="#bcd3fb"/>
+    <rect x="186" y="266" width="78" height="20" rx="10" fill="#bcd3fb"/>
+    <circle cx="334" cy="338" r="58" fill="#fbbf24" stroke="#1d4ed8" stroke-width="10"/>
+    <circle cx="334" cy="338" r="41" fill="none" stroke="#f59e0b" stroke-width="5"/>
+    <path d="M348 320c-6-8-32-8-32 6s32 10 32 24-26 14-32 6M334 302v72" fill="none" stroke="#b45309" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

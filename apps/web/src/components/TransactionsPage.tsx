@@ -12,7 +12,7 @@ import {
 } from "../lib/data";
 import { dayLabel, formatMoney, monthLabel, type Period, periodNoun, periodRange, isLatestPeriod, shiftPeriod } from "../lib/format";
 import { useSwipeNav } from "../lib/swipe";
-import { AuthBanner, PeriodSwitcher, PeriodUnitBar, SyncPill } from "./ui";
+import { AuthBanner, PeriodSwitcher, PeriodUnitBar, SyncPill, tintOf } from "./ui";
 
 export function Totals({ transactions, currency }: { transactions: Transaction[]; currency: string }) {
   let expense = 0;
@@ -196,7 +196,7 @@ export function TransactionGroups({
               const sub = [t.time, acc?.name, merchant, t.note].filter(Boolean).join(" · ");
               return (
                 <button key={t.id} className="tx-row" onClick={() => onEdit(t)}>
-                  <span className="tx-icon" aria-hidden>
+                  <span className="tx-icon" data-tint={tintOf(cat.top?.id)} aria-hidden>
                     {cat.icon}
                   </span>
                   <span className="tx-main">
@@ -240,7 +240,7 @@ function TransferRow({
   const delta = accountId ? accountDelta(t, accountId) : null;
   return (
     <button className="tx-row" onClick={() => onEdit(t)}>
-      <span className="tx-icon" aria-hidden>
+      <span className="tx-icon" data-tint="1" aria-hidden>
         🔁
       </span>
       <span className="tx-main">

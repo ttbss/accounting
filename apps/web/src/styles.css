@@ -1,38 +1,50 @@
 /*
- * 設計：「暖色手帳」——米白紙張色背景、深墨色文字、陶土橘重點色、橄欖綠代表收入。
+ * 設計：「清爽藍」——淡藍灰背景、白色卡片、藍色漸層的摘要卡與「＋」、浮動的膠囊分頁列，
+ * 每個分類圖示有自己的淡色底。
  * 顏色、字級、間距、圓角都集中在 :root 的變數；深色模式只換顏色。
  */
 :root {
   color-scheme: light;
 
   /* 顏色 */
-  --bg: #f6f1e9;
-  --surface: #fffdf9;
-  --surface-2: #efe7da;
-  --surface-3: #e6dccb;
-  --text: #2b2622;
-  --text-2: #6f655a;
-  --muted: #a0968a;
-  --line: #eee6da;
-  --border: rgba(74, 56, 36, 0.1);
-  --accent: #d4623a;
-  --accent-strong: #b44a25;
+  --bg: #f3f6fb;
+  --surface: #ffffff;
+  --surface-2: #edf1f7;
+  --surface-3: #dfe6f0;
+  --text: #0f172a;
+  --text-2: #5b6576;
+  --muted: #97a1b1;
+  --line: #edf1f6;
+  --border: rgba(15, 23, 42, 0.07);
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
   --accent-ink: #ffffff;
-  --accent-soft: #fae3d7;
-  --bar: #d4623a;
-  --bar-track: #f1e8dc;
-  --income: #3d7a4c;
-  --income-soft: #e1eedf;
-  --danger: #b8322a;
-  --warn-bg: #fbecd0;
-  --warn-ink: #6b4a00;
-  --ok: #4c9a5f;
-  --warn: #e0a326;
-  --bad: #c8412f;
-  --backdrop: rgba(43, 32, 22, 0.42);
-  --shadow: 0 1px 2px rgba(74, 56, 36, 0.05), 0 6px 18px rgba(74, 56, 36, 0.06);
-  --shadow-float: 0 8px 22px rgba(180, 74, 37, 0.32);
-  --shadow-sheet: 0 -8px 30px rgba(43, 32, 22, 0.12);
+  --accent-soft: #e5edfd;
+  --accent-grad: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  --on-grad: #ffffff;
+  --on-grad-chip: rgba(255, 255, 255, 0.16);
+  --bar: #3b82f6;
+  --bar-track: #edf1f7;
+  --income: #059669;
+  --income-soft: #dcfce7;
+  --danger: #dc2626;
+  --warn-bg: #fef3c7;
+  --warn-ink: #78350f;
+  --ok: #10b981;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+  --backdrop: rgba(15, 23, 42, 0.45);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
+  --shadow-float: 0 8px 20px rgba(37, 99, 235, 0.32);
+  --shadow-bar: 0 6px 24px rgba(15, 23, 42, 0.12);
+  --shadow-sheet: 0 -8px 30px rgba(15, 23, 42, 0.14);
+  /* 分類圖示的淡色底（依分類輪流使用） */
+  --tint-0: #ffedd5;
+  --tint-1: #dbeafe;
+  --tint-2: #dcfce7;
+  --tint-3: #f3e8ff;
+  --tint-4: #fce7f3;
+  --tint-5: #fef9c3;
 
   /* 字級 */
   --fs-2xs: 11px;
@@ -67,7 +79,10 @@
   --radius: var(--r-lg);
 
   /* 版面 */
-  --tabbar-h: 64px;
+  --tabbar-h: 60px;
+  /* 浮動分頁列離畫面底部的距離 */
+  --tabbar-gap: 10px;
+  --tabbar-space: calc(var(--tabbar-h) + var(--tabbar-gap) + var(--safe-bottom));
   --fab-size: 58px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -81,65 +96,85 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #1a1714;
-    --surface: #24201c;
-    --surface-2: #322c26;
-    --surface-3: #3d362f;
-    --text: #f1ebe2;
-    --text-2: #b8ad9f;
-    --muted: #847a6e;
-    --line: #332d27;
-    --border: rgba(255, 236, 214, 0.08);
-    --accent: #f08a60;
-    --accent-strong: #ffa37d;
-    --accent-ink: #1f1510;
-    --accent-soft: #42291c;
-    --bar: #f08a60;
-    --bar-track: #2f2924;
-    --income: #8ccb9a;
-    --income-soft: #22352a;
-    --danger: #f2826f;
-    --warn-bg: #3b2d10;
+    --bg: #0b1120;
+    --surface: #151c2c;
+    --surface-2: #1f2839;
+    --surface-3: #2a3448;
+    --text: #e6ebf3;
+    --text-2: #9aa5b8;
+    --muted: #64708a;
+    --line: #222b3c;
+    --border: rgba(148, 163, 184, 0.12);
+    --accent: #6ea8ff;
+    --accent-strong: #93c0ff;
+    --accent-ink: #0b1120;
+    --accent-soft: #1c2c4a;
+    --accent-grad: linear-gradient(135deg, #2b5fd6, #1a3f9e);
+    --on-grad: #ffffff;
+    --on-grad-chip: rgba(255, 255, 255, 0.12);
+    --bar: #6ea8ff;
+    --bar-track: #1f2839;
+    --income: #34d399;
+    --income-soft: #143326;
+    --danger: #f87171;
+    --warn-bg: #3a2c0a;
     --warn-ink: #f5d38a;
-    --ok: #7cc48c;
-    --warn: #f0b94a;
-    --bad: #f07a68;
-    --backdrop: rgba(0, 0, 0, 0.55);
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --backdrop: rgba(0, 0, 0, 0.6);
     --shadow: none;
-    --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.5);
+    --shadow-bar: 0 0 0 1px #222b3c, 0 8px 24px rgba(0, 0, 0, 0.5);
     --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
+    --tint-0: #3b2a1a;
+    --tint-1: #1c2c4a;
+    --tint-2: #143326;
+    --tint-3: #2c2142;
+    --tint-4: #3a1d2e;
+    --tint-5: #35321a;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1a1714;
-  --surface: #24201c;
-  --surface-2: #322c26;
-  --surface-3: #3d362f;
-  --text: #f1ebe2;
-  --text-2: #b8ad9f;
-  --muted: #847a6e;
-  --line: #332d27;
-  --border: rgba(255, 236, 214, 0.08);
-  --accent: #f08a60;
-  --accent-strong: #ffa37d;
-  --accent-ink: #1f1510;
-  --accent-soft: #42291c;
-  --bar: #f08a60;
-  --bar-track: #2f2924;
-  --income: #8ccb9a;
-  --income-soft: #22352a;
-  --danger: #f2826f;
-  --warn-bg: #3b2d10;
+  --bg: #0b1120;
+  --surface: #151c2c;
+  --surface-2: #1f2839;
+  --surface-3: #2a3448;
+  --text: #e6ebf3;
+  --text-2: #9aa5b8;
+  --muted: #64708a;
+  --line: #222b3c;
+  --border: rgba(148, 163, 184, 0.12);
+  --accent: #6ea8ff;
+  --accent-strong: #93c0ff;
+  --accent-ink: #0b1120;
+  --accent-soft: #1c2c4a;
+  --accent-grad: linear-gradient(135deg, #2b5fd6, #1a3f9e);
+  --on-grad: #ffffff;
+  --on-grad-chip: rgba(255, 255, 255, 0.12);
+  --bar: #6ea8ff;
+  --bar-track: #1f2839;
+  --income: #34d399;
+  --income-soft: #143326;
+  --danger: #f87171;
+  --warn-bg: #3a2c0a;
   --warn-ink: #f5d38a;
-  --ok: #7cc48c;
-  --warn: #f0b94a;
-  --bad: #f07a68;
-  --backdrop: rgba(0, 0, 0, 0.55);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --backdrop: rgba(0, 0, 0, 0.6);
   --shadow: none;
-  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --shadow-bar: 0 0 0 1px #222b3c, 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  --tint-0: #3b2a1a;
+  --tint-1: #1c2c4a;
+  --tint-2: #143326;
+  --tint-3: #2c2142;
+  --tint-4: #3a1d2e;
+  --tint-5: #35321a;
 }
 
 * {
@@ -185,7 +220,7 @@ button {
 }
 
 .page {
-  padding: calc(var(--sp-3) + var(--safe-top)) var(--sp-4) calc(var(--tabbar-h) + var(--safe-bottom) + 96px);
+  padding: calc(var(--sp-3) + var(--safe-top)) var(--sp-4) calc(var(--tabbar-space) + 96px);
 }
 
 /* ── 頁首 ─────────────────────────── */
@@ -263,16 +298,20 @@ button {
   box-shadow: var(--shadow);
 }
 
-/* 收支摘要：大數字直接寫在頁面上，像手帳的月結 */
+/* 收支摘要：藍色漸層卡片，支出放大，收入／結餘放下面 */
 .summary {
-  padding: var(--sp-2) 2px var(--sp-4);
+  background: var(--accent-grad);
+  color: var(--on-grad);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  margin: var(--sp-1) 0 var(--sp-4);
+  box-shadow: var(--shadow-float);
 }
 
 .summary-label {
   font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--text-2);
-  letter-spacing: 1px;
+  font-weight: var(--fw-medium);
+  opacity: 0.85;
 }
 
 .summary-value {
@@ -289,36 +328,31 @@ button {
 
 .summary-stats {
   display: flex;
-  gap: var(--sp-6);
-  padding-top: var(--sp-3);
-  border-top: 1.5px dashed var(--surface-3);
+  gap: var(--sp-2);
 }
 
 .summary-stat {
+  flex: 1;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
+  flex-direction: column;
+  padding: 6px var(--sp-3) var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--on-grad-chip);
+  font-size: var(--fs-xs);
+}
+
+.summary-stat span {
+  opacity: 0.85;
 }
 
 .summary-stat b {
   font-size: var(--fs-base);
-  font-weight: var(--fw-semibold);
-  color: var(--text);
+  font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.summary-stat b.income {
-  color: var(--income);
-}
-
-.summary-stat b.negative {
-  color: var(--danger);
 }
 
 /* ── 明細清單 ─────────────────────── */
@@ -336,8 +370,7 @@ button {
   padding: var(--sp-3) var(--sp-4) var(--sp-1);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
-  color: var(--accent-strong);
-  letter-spacing: 0.3px;
+  color: var(--text-2);
 }
 
 .day-head > span:last-child {
@@ -376,7 +409,7 @@ button {
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 50%;
+  border-radius: 13px;
   background: var(--surface-2);
   display: grid;
   place-items: center;
@@ -423,13 +456,21 @@ button {
   padding: var(--sp-8) var(--sp-4) 48px;
 }
 
+/* 依分類輪流的淡色底（data-tint 由元件依分類 id 算出） */
+:is(.tx-icon, .row-icon)[data-tint="0"] { background: var(--tint-0); }
+:is(.tx-icon, .row-icon)[data-tint="1"] { background: var(--tint-1); }
+:is(.tx-icon, .row-icon)[data-tint="2"] { background: var(--tint-2); }
+:is(.tx-icon, .row-icon)[data-tint="3"] { background: var(--tint-3); }
+:is(.tx-icon, .row-icon)[data-tint="4"] { background: var(--tint-4); }
+:is(.tx-icon, .row-icon)[data-tint="5"] { background: var(--tint-5); }
+
 .empty-icon,
 .empty .big {
   width: 72px;
   height: 72px;
   margin: 0 auto var(--sp-3);
-  border-radius: 50%;
-  background: var(--surface-2);
+  border-radius: 22px;
+  background: var(--accent-soft);
   display: grid;
   place-items: center;
   font-size: 34px;
@@ -447,13 +488,13 @@ button {
 .fab {
   position: fixed;
   right: max(var(--sp-4), calc(50vw - 280px + var(--sp-4)));
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--sp-4));
+  bottom: calc(var(--tabbar-space) + var(--sp-3));
   width: var(--fab-size);
   height: var(--fab-size);
-  border-radius: var(--r-lg);
+  border-radius: 50%;
   border: 0;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--accent-grad);
+  color: var(--on-grad);
   display: grid;
   place-items: center;
   box-shadow: var(--shadow-float);
@@ -467,26 +508,30 @@ button {
 
 /* ── 底部分頁列 ─────────────────── */
 
+/* 浮動的膠囊分頁列 */
 .tabbar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: calc(var(--tabbar-h) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
+  bottom: calc(var(--tabbar-gap) + var(--safe-bottom));
+  padding: 0 var(--sp-3);
   display: flex;
   justify-content: center;
+  pointer-events: none;
   z-index: 20;
 }
 
 .tabbar-inner {
   display: flex;
   width: 100%;
-  max-width: 560px;
+  max-width: 536px;
+  height: var(--tabbar-h);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-bar);
+  pointer-events: auto;
 }
 
 .tab {
@@ -505,23 +550,27 @@ button {
 }
 
 .tab .tab-icon {
-  width: 52px;
-  height: 30px;
-  border-radius: var(--r-pill);
   display: grid;
   place-items: center;
   line-height: 0;
-  transition: background-color 0.15s var(--ease);
 }
 
 .tab[aria-current="page"] {
-  color: var(--text);
+  color: var(--accent);
   font-weight: var(--fw-bold);
 }
 
-.tab[aria-current="page"] .tab-icon {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+/* 目前分頁：文字下面一個小圓點 */
+.tab::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.tab[aria-current="page"]::after {
+  background: var(--accent);
 }
 
 /* ── 同步狀態 ─────────────────── */
@@ -608,7 +657,7 @@ button {
   background: var(--surface);
   color: var(--text);
   font-weight: var(--fw-bold);
-  box-shadow: 0 1px 3px rgba(74, 56, 36, 0.14);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
 .segmented.full {
@@ -680,7 +729,7 @@ button {
 .rank-bar > div {
   height: 100%;
   min-width: 4px;
-  background: var(--bar);
+  background: var(--accent-grad);
   border-radius: var(--r-pill);
 }
 
@@ -800,7 +849,7 @@ button {
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
   color: var(--text-2);
-  letter-spacing: 1px;
+  letter-spacing: 0.3px;
   margin: var(--sp-5) var(--sp-1) var(--sp-2);
 }
 
@@ -866,16 +915,24 @@ button.list-row:active {
   place-items: center;
 }
 
-.row-badge.acct-cash,
-.row-badge.acct-e_wallet {
+.row-badge.acct-cash {
   background: var(--income-soft);
   color: var(--income);
 }
 
-.row-badge.acct-bank,
-.row-badge.acct-credit_card {
+.row-badge.acct-bank {
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.row-badge.acct-credit_card {
+  background: var(--tint-3);
+  color: #8b5cf6;
+}
+
+.row-badge.acct-e_wallet {
+  background: var(--tint-0);
+  color: #ea7a2c;
 }
 
 .order-btns {
@@ -1251,7 +1308,7 @@ select.input {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 92px);
+  bottom: calc(var(--tabbar-space) + 88px);
   background: var(--text);
   color: var(--bg);
   padding: 10px 18px;
@@ -1309,7 +1366,7 @@ select.input {
   font-size: 20px;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--surface-2);
   display: grid;
   place-items: center;
@@ -1385,11 +1442,11 @@ select.input {
   margin-bottom: 0;
 }
 
-/* 帳戶分頁最上面的淨資產：用重點色的「封面」 */
+/* 帳戶分頁最上面的淨資產：跟收支摘要一樣的漸層卡 */
 .acct-hero-main {
-  background: var(--accent);
+  background: var(--accent-grad);
   border-color: transparent;
-  color: var(--accent-ink);
+  color: var(--on-grad);
   box-shadow: var(--shadow-float);
 }
 
@@ -1409,7 +1466,7 @@ select.input {
   font-size: var(--fs-sm);
   color: var(--text-2);
   padding-top: var(--sp-3);
-  border-top: 1.5px dashed var(--surface-3);
+  border-top: 1px solid var(--line);
 }
 
 .acct-hero .acct-stats b {
@@ -1488,7 +1545,7 @@ select.input {
   padding: var(--sp-3) 10px var(--sp-1);
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
-  color: var(--accent-strong);
+  color: var(--accent);
   letter-spacing: 0.5px;
 }
 
@@ -1737,7 +1794,7 @@ select.input {
 
 .sync-actions {
   position: sticky;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--sp-3));
+  bottom: calc(var(--tabbar-space) + var(--sp-3));
   display: flex;
   gap: var(--sp-2);
   margin-top: var(--sp-5);
@@ -1745,7 +1802,7 @@ select.input {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow), 0 -4px 20px rgba(74, 56, 36, 0.08);
+  box-shadow: var(--shadow), 0 -4px 20px rgba(15, 23, 42, 0.08);
 }
 
 .sync-actions .grow {

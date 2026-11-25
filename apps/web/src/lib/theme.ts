@@ -6,7 +6,7 @@ export type ThemePref = "system" | "light" | "dark";
 
 const KEY = "theme";
 /** 跟 styles.css 的 --bg 一樣，讓狀態列和頁面同色 */
-const BAR_COLOR = { light: "#f6f1e9", dark: "#1a1714" } as const;
+const BAR_COLOR = { light: "#f3f6fb", dark: "#0b1120" } as const;
 
 export function loadTheme(): ThemePref {
   try {
